@@ -1,0 +1,10 @@
+/storage/installed.lock
+/storage/backups/*
+/storage/logs/*
+/storage/exports/*
+!/storage/**/.gitkeep
+/public/uploads/*
+!/public/uploads/.htaccess
+/installer/cache/
+/installer/build/
+/installer/output/

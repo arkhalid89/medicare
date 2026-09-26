@@ -1,0 +1,32 @@
+# Development / test stack only. On the clinic PC use XAMPP (see README.md).
+# The project is mounted under a sub-folder so the Base URL handling is
+# exercised exactly as on XAMPP: http://localhost:8110/medicare-practice/public
+services:
+  web:
+    build: ./docker
+    ports:
+      - "8110:80"
+    volumes:
+      - ./:/var/www/html/medicare-practice
+    environment:
+      APP_BASE_URL: http://localhost:8110/medicare-practice/public
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: medicare_practice
+      DB_USER: medicare
+      DB_PASS: medicare
+    depends_on:
+      - db
+  db:
+    image: mariadb:10.6
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: medicare_practice
+      MARIADB_USER: medicare
+      MARIADB_PASSWORD: medicare
+    ports:
+      - "33110:3306"
+    volumes:
+      - dbdata:/var/lib/mysql
+volumes:
+  dbdata:

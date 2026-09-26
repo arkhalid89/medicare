@@ -1,0 +1,12 @@
+# MediCare Practice — public folder
+Options -Indexes
+DirectoryIndex index.php
+
+# Optional pretty URLs (set 'pretty_urls' => true in config/config.php).
+# Harmless when pretty URLs are off: only unknown paths are routed.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php?r=$1 [QSA,L]
+</IfModule>
