@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "medicare-practice (docker)",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": ["compose", "up", "--build"],
+      "port": 8110,
+      "url": "http://localhost:8110"
+    }
+  ]
+}
