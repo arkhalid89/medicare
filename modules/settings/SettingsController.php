@@ -18,9 +18,8 @@ final class SettingsController extends Controller
 {
     public const DATE_FORMATS = ['d-m-Y' => '26-09-2026', 'd/m/Y' => '26/09/2026', 'd M Y' => '26 Sep 2026', 'Y-m-d' => '2026-09-26', 'm/d/Y' => '09/26/2026'];
     public const SPLIT_MODES = [
-        'same_page'              => 'All Rx sections stacked on the same page',
-        'separate_pages'         => 'Each Rx section on a separate page',
-        'separate_prescriptions' => 'A separate full prescription per source',
+        'slip'          => 'Hospital slip below a cut line on the same page',
+        'separate_page' => 'Hospital slip on a separate page',
     ];
 
     public function general(): void
@@ -39,17 +38,24 @@ final class SettingsController extends Controller
                 ->max('extra_vitals', 'Extra vitals', 500)
                 ->integer('follow_up_default_days', 'Default follow-up days', 0, 365)
                 ->in('auto_backup', 'Automatic backup', ['off', 'daily', 'weekly'])
-                ->integer('backup_retention', 'Backups to keep', 1, 500);
+                ->integer('backup_retention', 'Backups to keep', 1, 500)
+                ->max('org_phc_reg_no', 'PHC Reg. No.', 50)->max('org_phc_rl_no', 'PHC RL No.', 50)
+                ->max('org_slogan_ur', 'Slogan', 150)->max('clinic_timings', 'Clinic days & timings', 150);
             $errors = $v->errors();
 
             $logo = Upload::image($_FILES['org_logo'] ?? null, 'branding');
             if (!$logo['ok'] && ($logo['message'] ?? '') !== '') {
                 $errors['org_logo'] = $logo['message'];
             }
+            $qrUpload = Upload::image($_FILES['org_qr_image'] ?? null, 'branding');
+            if (!$qrUpload['ok'] && ($qrUpload['message'] ?? '') !== '') {
+                $errors['org_qr_image'] = $qrUpload['message'];
+            }
             if (!$errors) {
                 $values = [];
                 foreach (['org_name', 'org_tagline', 'org_address', 'org_phone', 'org_email', 'currency_symbol', 'currency_code', 'date_format',
-                          'default_paper', 'records_per_page', 'extra_vitals', 'follow_up_default_days', 'auto_backup', 'backup_retention'] as $k) {
+                          'default_paper', 'records_per_page', 'extra_vitals', 'follow_up_default_days', 'auto_backup', 'backup_retention',
+                          'org_phc_reg_no', 'org_phc_rl_no', 'org_slogan_ur', 'clinic_timings'] as $k) {
                     $values[$k] = trim((string) ($_POST[$k] ?? ''));
                 }
                 $values['discount_enabled'] = !empty($_POST['discount_enabled']) ? '1' : '0';
@@ -60,6 +66,13 @@ final class SettingsController extends Controller
                 } elseif (!empty($_POST['remove_logo'])) {
                     Upload::delete((string) setting('org_logo'));
                     $values['org_logo'] = '';
+                }
+                if ($qrUpload['ok']) {
+                    Upload::delete((string) setting('org_qr_image'));
+                    $values['org_qr_image'] = $qrUpload['path'];
+                } elseif (!empty($_POST['remove_qr'])) {
+                    Upload::delete((string) setting('org_qr_image'));
+                    $values['org_qr_image'] = '';
                 }
                 Settings::set($values);
                 ActivityLog::record('Settings updated', 'settings', null, 'Organization & system settings updated');
@@ -130,37 +143,65 @@ final class SettingsController extends Controller
     public function rx(): void
     {
         $errors = [];
+        $sources = DB::all('SELECT s.id, s.name, s.short_code, s.is_active, s.display_order,
+                                   (SELECT COUNT(*) FROM medicines m WHERE m.source_id = s.id AND m.deleted_at IS NULL) AS medicines
+                              FROM medicine_sources s WHERE s.deleted_at IS NULL ORDER BY s.display_order, s.name');
         if (is_post()) {
             $v = new Validator($_POST);
             $v->in('rx_split_print_mode', 'Print mode', array_keys(self::SPLIT_MODES))
-                ->in('rx_split_method', 'Split method', ['source'])
-                ->required('rx_unassigned_label', 'Label for medicines without a source')->max('rx_unassigned_label', 'Label', 60);
+                ->required('rx_unassigned_label', 'Label for medicines without a source')->max('rx_unassigned_label', 'Label', 60)
+                ->required('rx_slip_title', 'Slip title')->max('rx_slip_title', 'Slip title', 80);
+            $main = (string) ($_POST['rx_main_source_id'] ?? '');
+            if ($main !== '' && !in_array((int) $main, array_map('intval', array_column($sources, 'id')), true)) {
+                $v->add('rx_main_source_id', 'Choose a valid main-Rx source.');
+            }
             $errors = $v->errors();
             if (!$errors) {
-                $old = [setting('rx_split_enabled'), setting('rx_split_print_mode')];
-                DB::transaction(static function (): void {
+                $old = Settings::all();
+                DB::transaction(static function () use ($main): void {
                     Settings::set([
                         'rx_split_enabled'    => !empty($_POST['rx_split_enabled']) ? '1' : '0',
                         'rx_split_method'     => 'source',
+                        'rx_main_source_id'   => $main,
                         'rx_split_print_mode' => (string) $_POST['rx_split_print_mode'],
                         'rx_unassigned_label' => trim((string) $_POST['rx_unassigned_label']),
+                        'rx_slip_title'       => trim((string) $_POST['rx_slip_title']),
+                        'rx_show_urdu'        => !empty($_POST['rx_show_urdu']) ? '1' : '0',
+                        'rx_slip_prices'      => !empty($_POST['rx_slip_prices']) ? '1' : '0',
+                        'rx_slip_cumulative'  => !empty($_POST['rx_slip_cumulative']) ? '1' : '0',
                     ]);
                     foreach ((array) ($_POST['order'] ?? []) as $sourceId => $order) {
                         DB::update('medicine_sources', ['display_order' => max(0, (int) $order), 'updated_at' => now(), 'updated_by' => Auth::id()], 'id = ?', [(int) $sourceId]);
                     }
                 });
-                ActivityLog::record('Rx split setting changed', 'settings', null,
-                    'Split ' . ($old[0] === '1' ? 'on' : 'off') . ' → ' . (setting('rx_split_enabled') === '1' ? 'on' : 'off')
-                    . '; mode ' . $old[1] . ' → ' . setting('rx_split_print_mode'));
-                flash('success', 'Rx split configuration saved. It applies to new prescriptions; saved visits keep their grouping.');
+                $changes = [];
+                foreach (['rx_split_enabled', 'rx_main_source_id', 'rx_split_print_mode', 'rx_show_urdu', 'rx_slip_prices', 'rx_slip_cumulative', 'rx_slip_title'] as $k) {
+                    if ((string) ($old[$k] ?? '') !== (string) setting($k)) {
+                        $changes[] = $k . ': ' . ($old[$k] ?? '') . ' → ' . setting($k);
+                    }
+                }
+                ActivityLog::record('Rx split setting changed', 'settings', null, $changes ? implode('; ', $changes) : 'Source order updated');
+                flash('success', 'Rx split configuration saved. It applies to new prescriptions; saved visits keep their split.');
                 redirect('settings/rx');
             }
         }
+        // One sample medicine per source for the live preview.
+        $samples = DB::all('SELECT m.name, m.strength, m.price, m.source_id, df.name AS form FROM medicines m
+                              LEFT JOIN dosage_forms df ON df.id = m.dosage_form_id
+                             WHERE m.deleted_at IS NULL AND m.is_active = 1 AND m.source_id IS NOT NULL
+                             ORDER BY m.source_id, m.display_order');
+        $perSource = [];
+        foreach ($samples as $m) {
+            if (count($perSource[$m['source_id']] ?? []) < 2) {
+                $perSource[$m['source_id']][] = ['name' => trim(($m['form'] ? $m['form'] . ' ' : '') . $m['name'] . ' ' . $m['strength']), 'price' => (float) $m['price']];
+            }
+        }
         $this->view('settings/rx', [
-            'title'   => 'Rx Split Configuration',
-            'errors'  => array_values($errors),
-            'sources' => DB::all('SELECT s.id, s.name, s.short_code, s.is_active, s.display_order, (SELECT COUNT(*) FROM medicines m WHERE m.source_id = s.id AND m.deleted_at IS NULL) AS medicines
-                                   FROM medicine_sources s WHERE s.deleted_at IS NULL ORDER BY s.display_order, s.name'),
+            'title'     => 'Rx Split Configuration',
+            'errors'    => array_values($errors),
+            'sources'   => $sources,
+            'samples'   => $perSource,
+            'currency'  => (string) setting('currency_symbol', 'Rs.'),
         ]);
     }
 
@@ -235,7 +276,7 @@ final class SettingsController extends Controller
                 }
                 $data['margin_mm'] = (int) $_POST['margin_mm'];
                 $data['font_size_pt'] = round((float) $_POST['font_size_pt'], 1);
-                foreach (['show_logo', 'show_prices', 'show_billing', 'show_signature'] as $k) {
+                foreach (['show_logo', 'show_prices', 'show_billing', 'show_signature', 'show_slogan', 'show_qr'] as $k) {
                     $data[$k] = !empty($_POST[$k]) ? 1 : 0;
                 }
                 if ($image['ok']) {

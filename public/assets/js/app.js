@@ -202,6 +202,7 @@
      * Minimal SVG charts. Config: {type:'line'|'bar', labels:[], series:[{name, data:[]}], money:bool}
      */
     APP.chart = function (el, cfg) {
+        if (cfg.type === 'pie') { APP.pie(el, cfg); return; }
         var W = el.clientWidth || 600, H = el.clientHeight || 240;
         var pad = { l: 46, r: 12, t: 12, b: 28 };
         var iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
@@ -212,7 +213,7 @@
         max = Math.max(step * 4, step);
         var n = cfg.labels.length;
         var colors = ['var(--primary)', 'var(--secondary)', '#1f9d55', '#e07b24'];
-        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">';
+        var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet">';
         for (var g = 0; g <= 4; g++) {
             var gy = pad.t + ih - (ih * g / 4);
             svg += '<line class="gridline" x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + gy + '" y2="' + gy + '"/>';
@@ -270,6 +271,53 @@
             return String(Math.round(v));
         }
         function fmt(v) { return cfg.money ? APP.money(v) : String(v); }
+    };
+
+    /**
+     * Donut pie chart with legend. cfg: {labels:[], data:[], title:'', centre:'label under total'}
+     */
+    APP.pie = function (el, cfg) {
+        var palette = ['#0A2463', '#C9A227', '#1f9d55', '#e07b24', '#2563eb', '#d23b3b', '#7c3aed', '#0891b2', '#65a30d', '#db2777', '#475569', '#b45309'];
+        var total = cfg.data.reduce(function (a, b) { return a + (b || 0); }, 0);
+        var size = 190, r = 80, cx = 95, cy = 95, inner = 50;
+        var svg = '<svg viewBox="0 0 ' + size + ' ' + size + '" class="pie-svg" role="img" aria-label="' + APP.esc(cfg.title || 'Pie chart') + '">';
+        if (!total) {
+            svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#eef1f6"/>';
+        } else {
+            var angle = -Math.PI / 2;
+            cfg.data.forEach(function (v, i) {
+                if (!v) return;
+                var slice = v / total * Math.PI * 2;
+                var tip = APP.esc(cfg.labels[i] + ': ' + v + ' (' + Math.round(v / total * 100) + '%)');
+                if (slice >= Math.PI * 2 - 0.0001) {
+                    svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + palette[i % palette.length] + '" data-tip="' + tip + '"/>';
+                } else {
+                    var x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+                    var x2 = cx + r * Math.cos(angle + slice), y2 = cy + r * Math.sin(angle + slice);
+                    svg += '<path d="M' + cx + ' ' + cy + ' L' + x1.toFixed(2) + ' ' + y1.toFixed(2) + ' A' + r + ' ' + r + ' 0 ' + (slice > Math.PI ? 1 : 0) + ' 1 ' +
+                        x2.toFixed(2) + ' ' + y2.toFixed(2) + ' Z" fill="' + palette[i % palette.length] + '" stroke="#fff" stroke-width="1.5" data-tip="' + tip + '"/>';
+                }
+                angle += slice;
+            });
+        }
+        svg += '<circle cx="' + cx + '" cy="' + cy + '" r="' + inner + '" fill="#fff"/>' +
+            '<text x="' + cx + '" y="' + (cy + 2) + '" text-anchor="middle" font-size="22" font-weight="700" fill="#0A2463">' + total + '</text>' +
+            '<text x="' + cx + '" y="' + (cy + 18) + '" text-anchor="middle" font-size="9" fill="#7a8699">' + APP.esc(cfg.centre || 'total') + '</text></svg>';
+        var legend = '<ul class="pie-legend">' + cfg.labels.map(function (l, i) {
+            return '<li><span style="background:' + palette[i % palette.length] + '"></span>' + APP.esc(l) + '<b>' + (cfg.data[i] || 0) + '</b></li>';
+        }).join('') + '</ul>';
+        el.innerHTML = '<div class="pie-wrap">' + svg + legend + '</div><div class="chart-tip"></div>';
+        var tipEl = el.querySelector('.chart-tip');
+        el.addEventListener('mousemove', function (e) {
+            var t = e.target.getAttribute && e.target.getAttribute('data-tip');
+            if (!t) { tipEl.style.display = 'none'; return; }
+            var rect = el.getBoundingClientRect();
+            tipEl.textContent = t;
+            tipEl.style.left = (e.clientX - rect.left) + 'px';
+            tipEl.style.top = (e.clientY - rect.top) + 'px';
+            tipEl.style.display = 'block';
+        });
+        el.addEventListener('mouseleave', function () { tipEl.style.display = 'none'; });
     };
 
     // ------------------------------------------------------------ wiring
@@ -368,10 +416,18 @@
             });
         });
 
-        // Charts
-        document.querySelectorAll('[data-chart]').forEach(function (el) {
-            try { APP.chart(el, JSON.parse(el.getAttribute('data-chart'))); } catch (e) { el.textContent = 'Chart unavailable'; }
-        });
+        // Charts — drawn at the element's real size, redrawn when the window size changes
+        function drawCharts() {
+            document.querySelectorAll('[data-chart]').forEach(function (el) {
+                try { APP.chart(el, JSON.parse(el.getAttribute('data-chart'))); } catch (e) { el.textContent = 'Chart unavailable'; }
+            });
+        }
+        drawCharts();
+        var lastWidth = window.innerWidth;
+        window.addEventListener('resize', APP.debounce(function () {
+            if (window.innerWidth !== lastWidth) { lastWidth = window.innerWidth; drawCharts(); }
+        }, 200));
+        document.querySelectorAll('[data-sidebar-toggle]').forEach(function (b) { b.addEventListener('click', function () { setTimeout(drawCharts, 260); }); });
 
         // Global search suggestions
         var gs = document.querySelector('[data-global-search] input[name=q]');

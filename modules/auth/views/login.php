@@ -4,11 +4,11 @@ $logo = setting('org_logo', '');
 $org = (string) setting('org_name', 'MediCare Clinic');
 $initials = org_initials();
 $features = [
-    ['stethoscope', 'One-page consultation', 'Vitals to print in a single screen'],
+    ['stethoscope', 'One-page consultation', 'Token → vitals → e-Rx → bill in one flow'],
     ['pill', 'Smart prescriptions', 'Auto quantity, pricing & Rx split'],
     ['printer', 'A4 · A5 · Thermal · Legal', 'Doctor-specific print designs'],
     ['chart', 'Reports & Excel', 'Visits, fees and every listing'],
-    ['shield', 'Role-based access', 'Super Admin, Dept Admin, Doctor, Reporting'],
+    ['shield', 'Department roles & workspaces', 'Front desk, billing, lab, pharmacy, dental, gynae …'],
     ['database', 'Offline & backed up', 'One-click full database backup'],
 ];
 ?>
@@ -45,6 +45,11 @@ $features = [
                 <div class="alert alert-danger"><?= icon('alert') ?><div><?= e($error) ?></div></div>
             <?php endif; ?>
 
+            <?php $lic = \App\Core\License::status(); if (!$lic['ok']): ?>
+                <div class="alert alert-danger"><?= icon('key') ?><div><?= e($lic['message']) ?><br><a href="<?= e(url('license')) ?>"><strong>Activate / renew subscription →</strong></a></div></div>
+            <?php elseif ($lic['state'] !== 'active'): ?>
+                <div class="alert alert-warning"><?= icon('key') ?><div><?= e($lic['message']) ?> <a href="<?= e(url('license')) ?>">Enter key</a></div></div>
+            <?php endif; ?>
             <form method="post" action="<?= e(url('login')) ?>" autocomplete="off">
                 <?= csrf_field() ?>
                 <div class="field">

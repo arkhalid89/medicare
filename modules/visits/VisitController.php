@@ -9,6 +9,7 @@ use App\Core\Controller;
 use App\Core\DB;
 use App\Core\Paginator;
 use App\Core\Scope;
+use App\Core\Urdu;
 use App\Modules\Patients\PatientService;
 use App\Modules\Templates\TemplateService;
 use App\Modules\Users\UserService;
@@ -114,19 +115,41 @@ final class VisitController extends Controller
             $prefill['patient'] = PatientService::forClient($patient);
         }
 
+        // Started from a token (OPD queue): patient, nurse vitals and the receipt come along.
+        if (($tokenId = (int) input('token_id', 0)) > 0) {
+            $token = DB::one('SELECT t.*, q.doctor_id, q.department_id FROM tokens t JOIN token_queues q ON q.id = t.queue_id WHERE t.id = ?', [$tokenId]);
+            if ($token && in_array($token['status'], ['waiting', 'called', 'serving', 'no_show'], true)) {
+                $prefill['token'] = ['id' => (int) $token['id'], 'label' => $token['token_label'], 'department_id' => $token['department_id'] ? (int) $token['department_id'] : null];
+                if (!$prefill['patient'] && ($p = PatientService::find((int) $token['patient_id']))) {
+                    $prefill['patient'] = PatientService::forClient($p);
+                }
+                $vit = DB::one('SELECT * FROM vitals WHERE token_id = ? ORDER BY id DESC LIMIT 1', [$tokenId]);
+                if ($vit) {
+                    $prefill['vitals'] = array_intersect_key($vit, VisitService::VITALS);
+                    $notices[] = 'Vitals recorded by the nurse at ' . date('h:i A', strtotime($vit['recorded_at'])) . ' are filled in.';
+                }
+                if ($token['invoice_id'] && ($pre = VisitService::prepaidFee((int) $token['invoice_id']))) {
+                    $prefill['prepaid'] = $pre + ['invoice_no' => (string) DB::value('SELECT invoice_no FROM invoices WHERE id = ?', [$token['invoice_id']])];
+                }
+                if (!$isDoctor && $token['doctor_id']) {
+                    $prefill['doctor_id'] = (int) $token['doctor_id'];
+                }
+            }
+        }
+
         if (($repeat = (int) input('repeat', 0)) > 0) {
             $visit = VisitService::load($repeat);
-            if (!$visit) {
+            $refill = $visit ? VisitService::refillData($repeat) : null;
+            if (!$refill) {
                 flash('error', 'Previous visit not found.');
                 redirect('visits/new');
             }
-            $lines = VisitService::repeatLines($repeat);
+            $prefill = array_merge($prefill, $refill);
             $prefill['patient'] = $visit['patient'] && !$visit['patient']['deleted_at'] ? PatientService::forClient($visit['patient']) : null;
-            $prefill['medicines'] = $lines['medicines'];
             $prefill['repeated_from_visit_id'] = $repeat;
-            $notices[] = 'Medicines repeated from visit ' . $visit['visit_no'] . ' (' . fmt_date($visit['visit_date']) . ') at current prices. The original prescription is unchanged.';
-            if ($lines['skipped']) {
-                $notices[] = 'Not repeated (inactive or removed from the medicine list): ' . implode(', ', $lines['skipped']) . '.';
+            $notices[] = 'Everything was repeated from visit ' . $visit['visit_no'] . ' (' . fmt_date($visit['visit_date']) . '), medicines at current prices. Change anything you need — the original prescription stays unchanged.';
+            if ($refill['skipped']) {
+                $notices[] = 'Not repeated (inactive or removed from the medicine list): ' . implode(', ', $refill['skipped']) . '.';
             }
         }
 
@@ -142,11 +165,19 @@ final class VisitController extends Controller
             }
         }
 
+        $config = $this->screenConfig('visit', $prefill);
+        $scripts = [];
+        foreach ($config['modules'] as $m) {
+            foreach ((array) ($m['scripts'] ?? []) as $s) {
+                $scripts[] = $s;
+            }
+        }
         $this->view('visits/new', [
             'title'   => 'New Visit',
-            'scripts' => ['js/consult.js'],
+            // Module scripts load first so they register their collectors before checkout.
+            'scripts' => array_merge(array_values(array_unique($scripts)), ['js/consult.js']),
             'notices' => $notices,
-            'config'  => $this->screenConfig('visit', $prefill),
+            'config'  => $config,
         ]);
     }
 
@@ -162,17 +193,26 @@ final class VisitController extends Controller
                 $doctors[] = ['id' => (int) $d['id'], 'name' => $d['name'], 'default_fee' => (float) $d['default_fee']];
             }
         }
+        $mainSource = MedicineCatalog::mainSourceId();
         return [
             'mode'           => $mode,
             'token'          => bin2hex(random_bytes(16)),
+            'trending'       => ClinicalItems::trending($isDoctor ? (int) $user['id'] : null),
+            'doseChoices'    => Urdu::DOSE_CHOICES,
+            'units'          => array_map(static fn ($u) => ['en' => $u[0], 'ur' => $u[1], 'factor' => $u[2]], Urdu::UNITS),
+            'instructionsUr' => MedicineCatalog::instructionsUrdu(),
+            'routesEn'       => Urdu::ROUTES_EN,
+            'mainSourceId'   => $mainSource,
+            'mainSourceName' => $mainSource ? (string) DB::value('SELECT name FROM medicine_sources WHERE id = ?', [$mainSource]) : '',
             'isDoctor'       => $isDoctor,
             'doctor'         => $isDoctor ? ['id' => $user['id'], 'name' => $user['name'], 'default_fee' => (float) ($user['default_fee'] ?? 0)] : null,
             'doctors'        => $doctors,
             'canEditPatient' => can('patients.edit'),
             'frequencies'    => array_values(array_map(static fn ($f) => [
                 'id' => (int) $f['id'], 'name' => $f['name'], 'code' => $f['code'], 'doses_per_day' => (float) $f['doses_per_day'], 'calc_mode' => $f['calc_mode'],
+                'ur' => $f['name_ur'] ?: (Urdu::FREQUENCIES[$f['code']] ?? ''),
             ], MedicineCatalog::frequencies())),
-            'routes'         => array_values(array_map(static fn ($r) => ['id' => (int) $r['id'], 'name' => $r['name']], MedicineCatalog::routes())),
+            'routes'         => array_values(array_map(static fn ($r) => ['id' => (int) $r['id'], 'name' => $r['name'], 'ur' => $r['name_ur'] ?: (Urdu::ROUTES[$r['name']] ?? '')], MedicineCatalog::routes())),
             'instructions'   => MedicineCatalog::instructions(),
             'extraVitals'    => VisitService::extraVitalLabels(),
             'templates'      => $isDoctor ? array_map(static fn ($t) => ['id' => (int) $t['id'], 'name' => $t['name'], 'fav' => (int) $t['is_favourite']], TemplateService::forDoctor($user['id'])) : [],
@@ -183,10 +223,16 @@ final class VisitController extends Controller
                 'split'            => setting('rx_split_enabled', '1') === '1',
                 'unassigned'       => (string) setting('rx_unassigned_label', 'General'),
                 'followUpDays'     => (int) setting('follow_up_default_days', 7),
+                'urdu'             => setting('rx_show_urdu', '1') === '1',
                 'defaultPaper'     => (string) setting('default_paper', 'a4'),
             ],
             'papers'         => UserService::PAPERS,
             'prefill'        => $prefill,
+            'departments'    => DB::pairs("SELECT id, name FROM departments WHERE deleted_at IS NULL AND is_active = 1 AND department_type = 'clinical' ORDER BY display_order, name"),
+            'myDepartments'  => $isDoctor ? $user['department_ids'] : [],
+            'visitTypes'     => DB::pairs('SELECT id, name FROM visit_types WHERE deleted_at IS NULL AND is_active = 1 ORDER BY display_order, name'),
+            'cosign'         => \App\Core\Auth::requiresCosign(),
+            'modules'        => $mode === 'visit' ? VisitHooks::screen(['prefill' => $prefill, 'user' => $user]) : [],
         ];
     }
 
@@ -203,7 +249,25 @@ final class VisitController extends Controller
         if (!$visit) {
             abort(404, 'Visit not found.');
         }
-        $this->view('visits/view', ['title' => 'Visit ' . $visit['visit_no'], 'v' => $visit]);
+        $this->guard($visit);
+        $this->view('visits/view', ['title' => 'Visit ' . $visit['visit_no'], 'v' => $visit, 'panels' => VisitHooks::panels($visit)]);
+    }
+
+    /**
+     * Clinical records are scoped (own / department / branch). Outside the
+     * scope only a logged break-glass grant opens them (Doc 1 §2.7).
+     */
+    private function guard(array $visit): void
+    {
+        if (Scope::visitAllowed($visit)) {
+            return;
+        }
+        ActivityLog::record('Access denied', 'visits', (string) $visit['id'], 'Visit outside the user\'s scope');
+        if (can('emergency.access')) {
+            flash('warning', 'This record belongs to another doctor\'s patient. In an emergency you can open it with break-glass access (logged and reviewed).');
+            redirect('emergency', ['patient_id' => $visit['patient_id']]);
+        }
+        abort(403);
     }
 
     /** Print preview / print / reprint in A4, A5, Thermal or Legal (BRD §49–53). */
@@ -213,6 +277,7 @@ final class VisitController extends Controller
         if (!$visit) {
             abort(404, 'Visit not found.');
         }
+        $this->guard($visit);
         $paper = (string) input('paper', setting('default_paper', 'a4'));
         if (!isset(UserService::PAPERS[$paper])) {
             $paper = 'a4';
@@ -220,7 +285,8 @@ final class VisitController extends Controller
         $design = DB::one('SELECT * FROM print_designs WHERE doctor_id = ? AND paper = ?', [$visit['doctor_id'], $paper])
             ?? UserService::defaultDesign((int) $visit['doctor_id'], $paper, $visit['doctor_name'], $visit['doctor']);
 
-        $mode = (int) $visit['rx_split_enabled'] === 1 && count($visit['groups']) > 1 ? (string) ($visit['rx_split_mode'] ?: 'same_page') : 'single';
+        // Where the hospital slip goes: below a cut line on the same page, or on its own page.
+        $mode = in_array($visit['rx_split_mode'], ['slip', 'separate_page'], true) ? $visit['rx_split_mode'] : (string) setting('rx_split_print_mode', 'slip');
         $this->view('visits/print', [
             'v'      => $visit,
             'paper'  => $paper,
@@ -259,6 +325,30 @@ final class VisitController extends Controller
     public function medicines(): void
     {
         $this->json(['ok' => true, 'items' => MedicineCatalog::search((string) input('q', ''))]);
+    }
+
+    /** JSON: previous visits of a patient (popup grid on the consultation screen). */
+    public function history(): void
+    {
+        $patientId = (int) input('patient_id', 0);
+        $rows = array_map(static function (array $r): array {
+            $r['date_text'] = fmt_datetime($r['visit_date']);
+            $r['follow_up_text'] = fmt_date($r['follow_up_date']);
+            $r['total_text'] = money($r['grand_total']);
+            $r['bp'] = $r['bp_systolic'] && $r['bp_diastolic'] ? $r['bp_systolic'] . '/' . $r['bp_diastolic'] : '';
+            return $r;
+        }, $patientId > 0 ? VisitService::history($patientId) : []);
+        $this->json(['ok' => true, 'items' => $rows]);
+    }
+
+    /** JSON: everything of a previous visit, to refill the consultation screen. */
+    public function refill(): void
+    {
+        $data = VisitService::refillData((int) input('id', 0));
+        if (!$data) {
+            $this->json(['ok' => false, 'message' => 'Visit not found.'], 404);
+        }
+        $this->json(['ok' => true, 'visit' => $data]);
     }
 
     public function lookup(): void

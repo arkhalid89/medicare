@@ -1,9 +1,10 @@
 <?php
+use App\Core\Auth;
 use App\Core\Router;
 
 $current = Router::current();
 if ($current === '') {
-    $current = 'dashboard';
+    $current = Auth::homeRoute();
 }
 // Generic master form belongs to the master being edited.
 if (in_array($current, ['masters/form'], true) && isset($_GET['type'])) {
@@ -13,6 +14,7 @@ if ($current === 'reports/fees-patient') {
     $current = 'reports/fees';
 }
 
+$routes = Router::routes();
 $isActive = static function (array $item) use ($current): bool {
     if (($item['route'] ?? null) === $current) {
         return true;
@@ -24,12 +26,21 @@ $isActive = static function (array $item) use ($current): bool {
     }
     return false;
 };
+$visibleItem = static fn (array $item): bool => Router::allowed($item['perm']) && (!isset($item['route']) || isset($routes[$item['route']]));
 
 $logo = setting('org_logo', '');
 $orgName = (string) setting('org_name', 'MediCare Clinic');
 $initials = org_initials();
 
-// Build visible menu (drop empty sections).
+// The user's workspaces (Doc 8 §4.2), grouped by section.
+$workspaces = Auth::workspaces();
+$wsRoutes = array_column($workspaces, 'route');
+$wsSections = [];
+foreach ($workspaces as $w) {
+    $wsSections[$w['section']][] = $w;
+}
+
+// Build visible menu (drop empty sections and items already shown as workspaces).
 $visible = [];
 $pendingSection = null;
 foreach (config('menu') as $item) {
@@ -37,11 +48,14 @@ foreach (config('menu') as $item) {
         $pendingSection = $item;
         continue;
     }
-    if (!can($item['perm'])) {
+    if (!$visibleItem($item)) {
+        continue;
+    }
+    if (isset($item['route']) && in_array($item['route'], $wsRoutes, true) && $item['route'] !== 'dashboard') {
         continue;
     }
     if (isset($item['children'])) {
-        $item['children'] = array_values(array_filter($item['children'], static fn ($c) => can($c['perm'])));
+        $item['children'] = array_values(array_filter($item['children'], static fn ($c) => $visibleItem($c) && !in_array($c['route'], $wsRoutes, true)));
         if (!$item['children']) {
             continue;
         }
@@ -62,6 +76,15 @@ foreach (config('menu') as $item) {
         </div>
     </div>
     <nav class="sidebar-nav">
+        <?php foreach ($wsSections as $section => $items): ?>
+            <div class="nav-section"><?= e($section) ?></div>
+            <?php foreach ($items as $w): ?>
+                <a href="<?= e(url($w['route'])) ?>" title="<?= e($w['name']) ?>"
+                   class="nav-link<?= $current === $w['route'] || str_starts_with($current, $w['route'] . '/') && !in_array($current, $wsRoutes, true) ? ' active' : '' ?><?= (int) $w['is_default'] ? ' highlight-soft' : '' ?>">
+                    <?= icon($w['icon']) ?><span><?= e($w['name']) ?></span>
+                </a>
+            <?php endforeach; ?>
+        <?php endforeach; ?>
         <?php foreach ($visible as $item): ?>
             <?php if (isset($item['section'])): ?>
                 <div class="nav-section"><?= e($item['section']) ?></div>

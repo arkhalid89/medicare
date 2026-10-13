@@ -74,6 +74,23 @@ final class Icons
         'id-card'      => '<rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 10h4M14 14h4M5 16c.5-1 1.6-1.5 3-1.5s2.5.5 3 1.5"/>',
         'archive'      => '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><path d="M10 12h4"/>',
         'grid'         => '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+        // v2 department icons
+        'receipt'      => '<path d="M4 2v20l3-2 3 2 3-2 3 2 3-2 1 .7V2l-1 .7L16 2l-3 2-3-2-3 2z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+        'file-text'    => '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M16 13H8M16 17H8M10 9H8"/>',
+        'monitor'      => '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
+        'tooth'        => '<path d="M7 3c-2.2 0-4 1.8-4 4.2 0 2.2 1 3.3 1.5 5.3.6 2.5.8 8.5 3 8.5 1.6 0 1.6-5 4.5-5s2.9 5 4.5 5c2.2 0 2.4-6 3-8.5.5-2 1.5-3.1 1.5-5.3C21 4.8 19.2 3 17 3c-1.9 0-2.9 1-5 1S8.9 3 7 3z"/>',
+        'image'        => '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+        'cart'         => '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
+        'droplet'      => '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+        'send'         => '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>',
+        'volume'       => '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14"/>',
+        'skip'         => '<polygon points="5 4 15 12 5 20 5 4"/><path d="M19 5v14"/>',
+        'barcode'      => '<path d="M3 5v14M7 5v14M10 5v14M14 5v14M17 5v14M21 5v14"/>',
+        'scissors'     => '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/>',
+        'unlock'       => '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+        'branch'       => '<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+        'baby'         => '<circle cx="12" cy="8" r="5"/><path d="M9 8h.01M15 8h.01M10 10.5c.6.6 1.4.6 2 0"/><path d="M7 21v-3a5 5 0 0 1 10 0v3"/>',
+        'zap'          => '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
     ];
 
     public static function svg(string $name, string $class = ''): string

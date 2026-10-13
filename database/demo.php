@@ -10,7 +10,7 @@ use App\Core\Auth;
 use App\Core\DB;
 use App\Modules\Visits\VisitService;
 
-return static function (int $visitCount = 240): void {
+return static function (int $visitCount = 360): void {
     mt_srand(2026);
     $pick = static fn (array $a) => $a[mt_rand(0, count($a) - 1)];
     $some = static function (array $a, int $min, int $max): array {
@@ -41,7 +41,7 @@ return static function (int $visitCount = 240): void {
 
     for ($n = 0; $n < $visitCount; $n++) {
         // Spread over the last 180 days, busier recently, with a few visits today.
-        $daysAgo = $n < 6 ? 0 : (int) floor(180 * (mt_rand(0, 1000) / 1000) ** 1.6);
+        $daysAgo = $n < 6 ? 0 : (int) floor(540 * (mt_rand(0, 1000) / 1000) ** 1.4);
         $visitDate = date('Y-m-d', strtotime("-$daysAgo days")) . ' ' . sprintf('%02d:%02d:00', mt_rand(9, 20), mt_rand(0, 59));
         if ($visitDate > now()) {
             $visitDate = now();

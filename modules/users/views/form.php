@@ -1,19 +1,62 @@
 <?php
 /**
- * @var array|null $user @var array $userDepartments @var array $departments @var array $fieldErrors @var string $nextCode
+ * @var array|null $user @var array $userDepartments @var array $departments @var array $branches
+ * @var array $roles @var array $assignments @var array $fieldErrors @var string $nextCode
  */
 use App\Core\Password;
+use App\Core\Rbac;
 use App\Core\View;
 
 echo View::partial('page_header', [
     'title'       => $user ? 'Edit User — ' . $user['name'] : 'Add User',
-    'description' => 'Account, role, departments and (for doctors) the prescription profile and MRN pattern.',
+    'description' => 'Account, roles per branch and department, department membership and (for doctors) the prescription profile.',
     'breadcrumbs' => [['Users', url('users')], [$user ? 'Edit' : 'Add']],
 ]);
 $val = static fn (string $f, $d = '') => old($f, $user[$f] ?? $d);
 $err = static fn (string $f): string => isset($fieldErrors[$f]) ? '<div class="error-text">' . e($fieldErrors[$f]) . '</div>' : '';
 $cls = static fn (string $f): string => isset($fieldErrors[$f]) ? ' is-invalid' : '';
-$role = (string) $val('role', 'doctor');
+if (!$assignments) {
+    $assignments = [['role_id' => 0, 'branch_id' => null, 'department_id' => null, 'is_primary' => true]];
+}
+$multiBranch = count($branches) > 1;
+
+// Role preview data: class and permission labels per role id.
+$labels = config('permissions.permissions');
+$roleInfo = [];
+foreach ($roles as $group) {
+    foreach ($group as $r) {
+        $list = [];
+        foreach (Rbac::rolePermissions($r['id']) as $code => $scope) {
+            $list[] = ($code === '*' ? 'All permissions' : ($labels[$code][1] ?? $code)) . ($scope !== 'branch' ? ' (' . $scope . ')' : '');
+        }
+        $roleInfo[$r['id']] = ['class' => $r['class'], 'name' => $r['name'], 'perms' => $list];
+    }
+}
+$roleSelect = static function (int $selected) use ($roles): string {
+    $html = '<option value="">— Select role —</option>';
+    foreach ($roles as $tier => $group) {
+        $html .= '<optgroup label="' . e($tier) . '">';
+        foreach ($group as $r) {
+            $html .= '<option value="' . $r['id'] . '"' . selected($r['id'], $selected) . '>' . e($r['name']) . ' (' . e($r['code']) . ')</option>';
+        }
+        $html .= '</optgroup>';
+    }
+    return $html;
+};
+$branchSelect = static function (?int $selected) use ($branches): string {
+    $html = '<option value="">All branches</option>';
+    foreach ($branches as $id => $name) {
+        $html .= '<option value="' . $id . '"' . ($selected !== null ? selected($id, $selected) : '') . '>' . e($name) . '</option>';
+    }
+    return $html;
+};
+$deptSelect = static function (?int $selected) use ($departments): string {
+    $html = '<option value="">Whole branch</option>';
+    foreach ($departments as $id => $name) {
+        $html .= '<option value="' . $id . '"' . ($selected !== null ? selected($id, $selected) : '') . '>' . e($name) . '</option>';
+    }
+    return $html;
+};
 ?>
 <form method="post" action="<?= e(url('users/form', ['id' => $user['id'] ?? null])) ?>" autocomplete="off">
     <?= csrf_field() ?>
@@ -43,6 +86,31 @@ $role = (string) $val('role', 'doctor');
                 </div>
             </div>
 
+            <div class="card">
+                <div class="card-header"><div class="card-title"><?= icon('shield') ?> Roles &amp; Access</div>
+                    <button type="button" class="btn btn-sm btn-outline" id="add-assign"><?= icon('plus') ?> Add Role</button></div>
+                <div class="card-body table-wrap">
+                    <p class="muted small mt-0">A person may hold several roles (e.g. Head of Medicine + visiting Dentist). A role bound to a department
+                        works only in that department; "Whole branch" applies everywhere in the branch. The primary role decides the home screen.</p>
+                    <table class="table table-compact" id="assign-table">
+                        <thead><tr><th>Role</th><?php if ($multiBranch): ?><th>Branch</th><?php endif; ?><th>Department</th><th class="text-center">Primary</th><th></th></tr></thead>
+                        <tbody>
+                        <?php foreach ($assignments as $i => $a): ?>
+                            <tr>
+                                <td><select class="input" name="assign[<?= $i ?>][role_id]" data-role><?= $roleSelect((int) $a['role_id']) ?></select>
+                                    <?php if (!$multiBranch): ?><input type="hidden" name="assign[<?= $i ?>][branch_id]" value="<?= e((string) ($a['branch_id'] ?? (array_key_first($branches) ?? ''))) ?>"><?php endif; ?></td>
+                                <?php if ($multiBranch): ?><td><select class="input" name="assign[<?= $i ?>][branch_id]"><?= $branchSelect($a['branch_id']) ?></select></td><?php endif; ?>
+                                <td><select class="input" name="assign[<?= $i ?>][department_id]"><?= $deptSelect($a['department_id']) ?></select></td>
+                                <td class="text-center"><input type="radio" name="primary" value="<?= $i ?>"<?= checked($a['is_primary']) ?>></td>
+                                <td><button type="button" class="act danger" data-remove title="Remove"><?= icon('x') ?></button></td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <?= $err('assign') ?>
+                </div>
+            </div>
+
             <div class="card" id="doctor-card">
                 <div class="card-header"><div class="card-title"><?= icon('stethoscope') ?> Doctor Profile</div></div>
                 <div class="card-body">
@@ -61,32 +129,28 @@ $role = (string) $val('role', 'doctor');
 
         <div>
             <div class="card">
-                <div class="card-header"><div class="card-title"><?= icon('shield') ?> Role &amp; Access</div></div>
+                <div class="card-header"><div class="card-title"><?= icon('building') ?> Departments &amp; Status</div></div>
                 <div class="card-body">
-                    <div class="field mb-2"><label>Role <span class="req">*</span></label>
-                        <select class="input<?= $cls('role') ?>" name="role" id="role-select">
-                            <?php foreach (config('permissions.roles') as $key => $r): ?><option value="<?= e($key) ?>"<?= selected($key, $role) ?>><?= e($r['label']) ?></option><?php endforeach; ?>
-                        </select><?= $err('role') ?></div>
-                    <div class="field mb-2"><label>Departments</label>
+                    <div class="field mb-2"><label>Member of departments</label>
                         <?php if (!$departments): ?>
                             <div class="hint">No departments yet. Create them under Master Data → Departments.</div>
                         <?php else: ?>
-                        <div class="check-list" style="flex-direction:column">
+                        <div class="check-list" style="flex-direction:column;max-height:260px;overflow:auto">
                             <?php foreach ($departments as $id => $name): ?>
                                 <label class="check"><input type="checkbox" name="departments[]" value="<?= $id ?>"<?= checked(in_array((int) $id, $userDepartments, true)) ?>> <?= e($name) ?></label>
                             <?php endforeach; ?>
                         </div>
                         <?php endif; ?>
                         <?= $err('departments') ?>
-                        <div class="hint">A Department Admin sees doctors, visits and reports of every department assigned here.</div>
+                        <div class="hint">Department-scope roles (Head of Department, Department Admin, nurses) see the records of these departments.</div>
                     </div>
                     <div class="field"><label>Status</label>
                         <label class="check"><input type="checkbox" name="is_active" value="1"<?= checked(is_post() ? !empty($_POST['is_active']) : (int) ($user['is_active'] ?? 1) === 1) ?>> Active (can log in)</label><?= $err('is_active') ?></div>
                 </div>
             </div>
             <div class="card">
-                <div class="card-header"><div class="card-title"><?= icon('info') ?> Role permissions</div></div>
-                <div class="card-body small" id="perm-list"></div>
+                <div class="card-header"><div class="card-title"><?= icon('info') ?> Effective permissions</div></div>
+                <div class="card-body small" id="perm-list" style="max-height:420px;overflow:auto"></div>
             </div>
         </div>
     </div>
@@ -95,29 +159,44 @@ $role = (string) $val('role', 'doctor');
         <button type="submit" class="btn btn-primary"><?= icon('save') ?> Save User</button>
     </div></div>
 </form>
-<?php
-$labels = config('permissions.labels');
-$matrix = [];
-foreach (config('permissions.roles') as $key => $r) {
-    $list = [];
-    foreach ($labels as $perm => $label) {
-        if (\App\Core\Auth::roleCan($key, $perm)) {
-            $list[] = $label;
-        }
-    }
-    $matrix[$key] = $list;
-}
-?>
+<template id="assign-row">
+    <tr>
+        <td><select class="input" name="assign[__i__][role_id]" data-role><?= $roleSelect(0) ?></select>
+            <?php if (!$multiBranch): ?><input type="hidden" name="assign[__i__][branch_id]" value="<?= e((string) (array_key_first($branches) ?? '')) ?>"><?php endif; ?></td>
+        <?php if ($multiBranch): ?><td><select class="input" name="assign[__i__][branch_id]"><?= $branchSelect(null) ?></select></td><?php endif; ?>
+        <td><select class="input" name="assign[__i__][department_id]"><?= $deptSelect(null) ?></select></td>
+        <td class="text-center"><input type="radio" name="primary" value="__i__"></td>
+        <td><button type="button" class="act danger" data-remove title="Remove"><?= icon('x') ?></button></td>
+    </tr>
+</template>
 <script>
 (function () {
-    var matrix = <?= json_encode($matrix) ?>;
-    var sel = document.getElementById('role-select');
+    var roles = <?= json_encode($roleInfo, JSON_UNESCAPED_UNICODE) ?>;
+    var table = document.querySelector('#assign-table tbody');
+    var next = table.children.length;
     function sync() {
-        document.getElementById('doctor-card').style.display = sel.value === 'doctor' ? '' : 'none';
-        document.getElementById('perm-list').innerHTML = '<ul style="margin:0;padding-left:1.1rem">' +
-            (matrix[sel.value] || []).map(function (p) { return '<li>' + APP.esc(p) + '</li>'; }).join('') + '</ul>';
+        var ids = Array.prototype.map.call(table.querySelectorAll('[data-role]'), function (s) { return s.value; }).filter(Boolean);
+        var doctor = ids.some(function (id) { return roles[id] && roles[id].class === 'doctor'; });
+        document.getElementById('doctor-card').style.display = doctor ? '' : 'none';
+        var html = ids.map(function (id) {
+            var r = roles[id]; if (!r) return '';
+            return '<strong>' + APP.esc(r.name) + '</strong><ul style="margin:.25rem 0 .6rem;padding-left:1.1rem">' +
+                r.perms.map(function (p) { return '<li>' + APP.esc(p) + '</li>'; }).join('') + '</ul>';
+        }).join('');
+        document.getElementById('perm-list').innerHTML = html || '<span class="muted">Select a role to see its permissions.</span>';
     }
-    sel.addEventListener('change', sync);
+    document.getElementById('add-assign').addEventListener('click', function () {
+        var tpl = document.getElementById('assign-row').innerHTML.replace(/__i__/g, String(next++));
+        var tmp = document.createElement('tbody');
+        tmp.innerHTML = tpl;
+        table.appendChild(tmp.firstElementChild);
+        sync();
+    });
+    table.addEventListener('change', sync);
+    table.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-remove]');
+        if (b && table.children.length > 1) { b.closest('tr').remove(); sync(); }
+    });
     sync();
 })();
 </script>

@@ -100,6 +100,14 @@ final class MasterController extends Controller
                     ActivityLog::record($def['singular'] . ' created', $key, (string) $id, $def['singular'] . ': ' . $data['name']);
                     flash('success', $def['singular'] . ' "' . $data['name'] . '" added successfully.');
                 }
+                // v2: a medicine is also a stock item — keep name, price and controlled flag in step.
+                if ($key === 'medicines' && class_exists('App\\Modules\\Inventory\\InventorySeeder') && \App\Core\Migrator::tableExists('items')) {
+                    $itemId = \App\Modules\Inventory\InventorySeeder::itemForMedicine($id);
+                    if ($itemId) {
+                        DB::update('items', ['name' => trim($data['name'] . ' ' . ($data['strength'] ?? '')), 'sale_price' => $data['price'],
+                            'is_controlled' => (int) ($data['is_controlled'] ?? 0), 'is_active' => $data['is_active'], 'updated_at' => now()], 'id = ?', [$itemId]);
+                    }
+                }
                 if (isset($_POST['save_new'])) {
                     redirect('masters/form', ['type' => $key]);
                 }

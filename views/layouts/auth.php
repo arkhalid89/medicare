@@ -11,11 +11,8 @@ use App\Core\View;
     <link rel="icon" href="<?= e(asset('img/favicon.svg')) ?>" type="image/svg+xml">
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
     <?= View::partial('theme') ?>
-</head>
-<body>
-<?= $content ?>
-<?= View::partial('common_ui') ?>
 <script>
+/* Loaded in <head> so inline page scripts can use APP immediately. */
 window.APP = {
     base: <?= json_encode(base_url()) ?>,
     pretty: <?= config('app.pretty_urls') ? 'true' : 'false' ?>,
@@ -24,5 +21,9 @@ window.APP = {
 };
 </script>
 <script src="<?= e(asset('js/app.js')) ?>"></script>
+</head>
+<body>
+<?= $content ?>
+<?= View::partial('common_ui') ?>
 </body>
 </html>

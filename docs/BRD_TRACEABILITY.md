@@ -14,6 +14,27 @@
 | D8 | Font Segoe UI 12px (§9) | Segoe UI, 13px default; Theme lets you choose 12–15px | 13px reads better in a browser. 12px is available. |
 | D9 | "Scheduled" backup | Runs at the first login after the daily or weekly period has passed | A plain offline PHP install has no cron. |
 
+## Version 1.1 change requests
+
+| # | Request | Implemented |
+|---|---|---|
+| 1 | Vitals: warn at runtime but allow saving | `VisitService::validateVitals()` returns warnings (only text/negative/unstorable values are errors); live hints in `consult.js` |
+| 2 | Trending top 20 complaints / symptoms / diagnoses / investigations | `ClinicalItems::trending()` (per doctor, with counts, topped up from the masters) |
+| 3 | Age ↔ DOB auto-calculation incl. months/days | `PatientService::dobFromAge()` / `ageParts()`, both forms |
+| 3.1 | Field order: phone, CNIC, name, father, gender, DOB, address | `patients/views/form.php`, `visits/views/new.php` |
+| 4 | Consultation UI for desktop / tablet / mobile, 2 columns | `.clinical-grid`, Rx cards, breakpoints in `app.css` |
+| 5 | Previous-visits popup with repeat & modify | `visits/history`, `visits/refill`, `VisitService::refillData()` |
+| 6 | Easier Visit view for lay people | `visits/views/view.php` |
+| 7 | Doctor dashboard stats + current / previous year pie charts | `DashboardController::doctor()`, `APP.pie()` |
+| 8 | Dose dropdowns (tablet fractions, spoons, drops, injections) | `dosage_forms.dose_type`, `Urdu::DOSE_CHOICES`, unit factor in `PrescriptionMath::quantity()` |
+| 9 | Main Rx by source order 1 without prices + Urdu noskha; other sources below a cut line with pricing and a day-cumulative bill; PHC letterhead; Rx split settings with live preview | `PrescriptionMath::assignGroups()` (main vs billable), `visits/views/print.php`, `Directions`, `VisitService::dayCumulative()`, `settings/rx` |
+| 10 | Clean activity logs by date range | `system/logs/clean`, `DataPurger` |
+| 12 | Table-wise / date-wise delete in Database Reset | `system/purge`, `DataPurger` |
+| 13 | Subscription key with expiry, offline | `core/License.php` (Ed25519 signature, phone-bound, trial, clock-tamper check), `tools/license.php`, `modules/license` |
+| — | Upgrade existing databases safely | `core/Migrator.php` (schema v2) |
+
+**Licence design note:** the request suggested hashing phone + dates. A hash cannot be reversed to read the dates, and a hash/HMAC secret inside the app could be copied to forge keys. A digital signature keeps the dates readable offline while only the vendor can create keys.
+
 ## Additions requested by the client
 
 | Requirement | Where |

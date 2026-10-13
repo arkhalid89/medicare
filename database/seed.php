@@ -1,16 +1,22 @@
 <?php
 /**
- * Default data: departments, users, and every master list with realistic
- * Pakistani clinic values (sources, complaints, symptoms, ICD-10 diagnoses,
- * investigations, routes, dosage forms, frequencies, instructions, medicines).
+ * Default data: branch, specialties, departments, roles & permissions,
+ * workspaces, users, and every master list with realistic Pakistani clinic
+ * values (sources, complaints, symptoms, ICD-10 diagnoses, investigations,
+ * routes, dosage forms, frequencies, instructions, medicines), followed by
+ * the department catalogs (services, stock items, lab tests, imaging,
+ * dental procedures …) through App\Core\Seeder.
  *
  * Options
- *   sample_users => true  : superadmin / deptadmin / doctor / doctor2 / reporting
+ *   sample_users => true  : one sample login per main role (see README)
  *   super_admin  => [...] : used instead of the sample users (factory reset)
  */
 declare(strict_types=1);
 
 use App\Core\DB;
+use App\Core\Password;
+use App\Core\Seeder;
+use App\Core\Urdu;
 use App\Modules\Users\UserService;
 
 return static function (array $options = []): void {
@@ -29,48 +35,53 @@ return static function (array $options = []): void {
     };
 
     DB::transaction(static function () use ($options, $insertAll): void {
-        // ---- Departments -------------------------------------------------
-        $dept = $insertAll('departments', ['name', 'code', 'description'], [
-            ['General OPD', 'OPD', 'General outpatient consultations'],
-            ['Internal Medicine', 'MED', 'Adult medicine and chronic disease clinic'],
-            ['Paediatrics', 'PED', 'Child health clinic'],
-        ]);
+        // ---- Branch, specialties, departments, roles, workspaces, services ----
+        Seeder::permissions();
+        $branchId = Seeder::branch();
+        Seeder::specialties();
+        Seeder::roles();
+        Seeder::departments();
+        Seeder::workspaces();
+        Seeder::services();
+        Seeder::visitTypes();
+        Seeder::displayBoard();
+        $dept = DB::pairs('SELECT name, id FROM departments WHERE deleted_at IS NULL');
 
         // ---- Users ---------------------------------------------------------
+        // [name, username, password, role code, departments, mobile, doctor profile, email]
         $users = [];
         if (!empty($options['super_admin'])) {
             $sa = $options['super_admin'];
-            $users[] = ['name' => $sa['name'], 'username' => $sa['username'], 'password' => $sa['password'], 'role' => 'super_admin',
-                'mobile' => $sa['mobile'] ?? null, 'email' => $sa['email'] ?? null, 'depts' => []];
+            $users[] = [$sa['name'], $sa['username'], $sa['password'], 'SA', [], $sa['mobile'] ?? null, null, $sa['email'] ?? null];
         } else {
-            $users[] = ['name' => 'System Administrator', 'username' => 'superadmin', 'password' => 'admin123', 'role' => 'super_admin', 'mobile' => '03000000001', 'email' => 'admin@medicare.local', 'depts' => []];
+            $users[] = ['System Administrator', 'superadmin', 'admin123', 'SA', [], '03000000001', null, 'admin@medicare.local'];
         }
         if (($options['sample_users'] ?? true) && empty($options['super_admin'])) {
-            $users[] = ['name' => 'Ayesha Siddiqui', 'username' => 'deptadmin', 'password' => 'admin123', 'role' => 'dept_admin', 'mobile' => '03000000002', 'email' => null, 'depts' => ['General OPD', 'Internal Medicine']];
-            $users[] = ['name' => 'Dr. Ahmed Raza', 'username' => 'doctor', 'password' => 'doctor123', 'role' => 'doctor', 'mobile' => '03000000003', 'email' => null, 'depts' => ['General OPD', 'Internal Medicine'],
-                'profile' => ['pmdc_registration' => '12345-P', 'qualification' => 'MBBS, FCPS (Medicine)', 'specialization' => 'Consultant Physician', 'mrn_pattern' => 'DR01-{YYYY}-{000001}', 'default_fee' => 1500, 'signature_text' => 'Dr. Ahmed Raza, MBBS, FCPS']];
-            $users[] = ['name' => 'Dr. Sana Malik', 'username' => 'doctor2', 'password' => 'doctor123', 'role' => 'doctor', 'mobile' => '03000000004', 'email' => null, 'depts' => ['Paediatrics'],
-                'profile' => ['pmdc_registration' => '67890-P', 'qualification' => 'MBBS, DCH', 'specialization' => 'Paediatrician', 'mrn_pattern' => 'DOC2-{YYYY}-{000001}', 'default_fee' => 1200, 'signature_text' => 'Dr. Sana Malik, MBBS, DCH']];
-            $users[] = ['name' => 'Bilal Ahmad', 'username' => 'reporting', 'password' => 'report123', 'role' => 'reporting', 'mobile' => '03000000005', 'email' => null, 'depts' => []];
+            foreach (Seeder::SAMPLE_USERS as $u) {
+                $users[] = $u;
+            }
         }
-        foreach ($users as $u) {
-            $deptIds = array_map(static fn ($n) => $dept[$n], $u['depts']);
+        foreach ($users as [$name, $username, $password, $roleCode, $deptNames, $mobile, $profile, $email]) {
+            $deptIds = array_values(array_filter(array_map(static fn ($n) => isset($dept[$n]) ? (int) $dept[$n] : null, $deptNames)));
+            $class = (string) DB::value('SELECT user_class FROM roles WHERE code = ?', [$roleCode]);
             $id = DB::insert('users', [
-                'employee_code' => UserService::nextEmployeeCode($u['role'], $deptIds),
-                'name'          => $u['name'],
-                'username'      => $u['username'],
-                'password'      => $u['password'],
-                'mobile'        => $u['mobile'],
-                'email'         => $u['email'],
-                'role'          => $u['role'],
+                'employee_code' => UserService::nextEmployeeCode($class, $deptIds, $roleCode),
+                'name'          => $name,
+                'username'      => $username,
+                'password'      => Password::isHash((string) $password) ? $password : Password::hash((string) $password),
+                'mobile'        => $mobile,
+                'email'         => $email,
+                'role'          => $class,
                 'is_active'     => 1,
                 'created_at'    => now(),
             ]);
             foreach ($deptIds as $d) {
                 DB::insert('user_departments', ['user_id' => $id, 'department_id' => $d]);
             }
-            if ($u['role'] === 'doctor') {
-                DB::insert('doctor_profiles', array_merge(['user_id' => $id, 'updated_at' => now()], $u['profile']));
+            $chainWide = in_array($roleCode, ['SA', 'RPT', 'AUD', 'ITA'], true);
+            Seeder::assign($id, $roleCode, $chainWide ? null : $branchId, null, true);
+            if ($class === 'doctor') {
+                DB::insert('doctor_profiles', array_merge(['user_id' => $id, 'updated_at' => now()], $profile ?? ['default_fee' => 0]));
                 UserService::ensureDoctorSetup($id);
             }
         }
@@ -115,17 +126,17 @@ return static function (array $options = []): void {
             ['X-Ray Chest PA View', 'Radiology', null], ['Ultrasound Abdomen', 'Radiology', null], ['ECG', 'Cardiology', null], ['TSH', 'Endocrinology', null],
         ]);
 
-        $routes = $insertAll('routes', ['name', 'short_name'], [
+        $routes = $insertAll('routes', ['name', 'short_name', 'name_ur'], array_map(static fn ($r) => [$r[0], $r[1], Urdu::ROUTES[$r[0]] ?? null], [
             ['Oral', 'PO'], ['Intravenous', 'IV'], ['Intramuscular', 'IM'], ['Subcutaneous', 'SC'], ['Topical', 'TOP'],
             ['Inhalation', 'INH'], ['Sublingual', 'SL'], ['Rectal', 'PR'], ['Nasal', 'NAS'], ['Ophthalmic', 'OPH'],
-        ]);
+        ]));
 
-        $forms = $insertAll('dosage_forms', ['name', 'short_name'], [
+        $forms = $insertAll('dosage_forms', ['name', 'short_name', 'dose_type'], array_map(static fn ($f) => [$f[0], $f[1], Urdu::guessDoseType($f[0])], [
             ['Tablet', 'Tab'], ['Capsule', 'Cap'], ['Syrup', 'Syp'], ['Injection', 'Inj'], ['Cream', 'Crm'], ['Ointment', 'Oint'],
             ['Drops', 'Drops'], ['Suspension', 'Susp'], ['Sachet', 'Sachet'], ['Inhaler', 'Inh'], ['Gel', 'Gel'],
-        ]);
+        ]));
 
-        $freq = $insertAll('frequencies', ['name', 'code', 'doses_per_day', 'calc_mode', 'description'], [
+        $freq = $insertAll('frequencies', ['name', 'code', 'doses_per_day', 'calc_mode', 'description', 'name_ur'], array_map(static fn ($f) => array_merge($f, [Urdu::FREQUENCIES[$f[1]] ?? null]), [
             ['Once a day', 'OD', 1, 'daily', 'One dose daily'],
             ['Twice a day', 'BD', 2, 'daily', 'Every 12 hours'],
             ['Three times a day', 'TDS', 3, 'daily', 'Every 8 hours'],
@@ -136,9 +147,9 @@ return static function (array $options = []): void {
             ['Once a week', 'Weekly', 1, 'weekly', 'One dose per week'],
             ['Immediately (single dose)', 'STAT', 0, 'manual', 'Single immediate dose'],
             ['Custom', 'Custom', 0, 'manual', 'Custom schedule — quantity entered by the doctor'],
-        ]);
+        ]));
 
-        $instr = $insertAll('instructions', ['name', 'description'], array_map(static fn ($n) => [$n, null], [
+        $instr = $insertAll('instructions', ['name', 'name_ur', 'description'], array_map(static fn ($n) => [$n, Urdu::INSTRUCTIONS[$n] ?? null, null], [
             'After meal', 'Before meal', 'With water', 'At bedtime', 'On empty stomach', 'Apply locally', 'As directed',
             'With milk', 'Shake well before use', 'Dissolve in water',
         ]));
@@ -155,7 +166,7 @@ return static function (array $options = []): void {
             ['Ciproxin', 'Ciprofloxacin', 'Ciproxin (Bayer)', '500mg', 'Tablet', 'Oral', 'BD', 'After meal', 1, 'tab', 5, 'Tablet', 1, 30, 'Hospital Stock'],
             ['Zyrtec', 'Cetirizine', 'Zyrtec (GSK)', '10mg', 'Tablet', 'Oral', 'HS', 'At bedtime', 1, 'tab', 5, 'Tablet', 1, 8, 'Local Pharmacy'],
             ['Ventolin Inhaler', 'Salbutamol', 'Ventolin (GSK)', '100mcg', 'Inhaler', 'Inhalation', 'SOS', 'As directed', 2, 'puff', 30, 'Inhaler', 200, 450, 'Distributor B'],
-            ['Calpol Syrup', 'Paracetamol', 'Calpol (GSK)', '120mg/5ml', 'Syrup', 'Oral', 'TDS', 'After meal', 5, 'ml', 3, 'Bottle', 60, 120, 'Local Pharmacy'],
+            ['Calpol Syrup', 'Paracetamol', 'Calpol (GSK)', '120mg/5ml', 'Syrup', 'Oral', 'TDS', 'After meal', 1, 'tsp', 3, 'Bottle', 60, 120, 'Local Pharmacy'],
             ['Motilium', 'Domperidone', 'Motilium (Janssen)', '10mg', 'Tablet', 'Oral', 'TDS', 'Before meal', 1, 'tab', 3, 'Tablet', 1, 4, 'Local Pharmacy'],
             ['ORS Sachet', 'Oral Rehydration Salts', 'Peditral', '20.5g', 'Sachet', 'Oral', 'SOS', 'Dissolve in water', 1, 'sachet', 3, 'Sachet', 1, 25, 'Local Pharmacy'],
             ['Rocephin Injection', 'Ceftriaxone', 'Rocephin (Roche)', '1g', 'Injection', 'Intravenous', 'OD', 'As directed', 1, 'vial', 3, 'Vial', 1, 350, 'Hospital Stock'],
@@ -171,7 +182,7 @@ return static function (array $options = []): void {
             ['Iberet', 'Ferrous Sulphate + Vitamins', 'Iberet (Abbott)', '525mg', 'Tablet', 'Oral', 'OD', 'After meal', 1, 'tab', 30, 'Tablet', 1, 12, 'Sample Stock'],
             ['Folic Acid', 'Folic Acid', 'Folic Acid', '5mg', 'Tablet', 'Oral', 'OD', 'After meal', 1, 'tab', 30, 'Tablet', 1, 2, 'Sample Stock'],
             ['Vermox', 'Mebendazole', 'Vermox (Janssen)', '100mg', 'Tablet', 'Oral', 'BD', 'After meal', 1, 'tab', 3, 'Tablet', 1, 10, 'Local Pharmacy'],
-            ['Gaviscon Syrup', 'Sodium Alginate + Antacid', 'Gaviscon (Reckitt)', '120ml', 'Syrup', 'Oral', 'TDS', 'After meal', 10, 'ml', 5, 'Bottle', 120, 280, 'Distributor B'],
+            ['Gaviscon Syrup', 'Sodium Alginate + Antacid', 'Gaviscon (Reckitt)', '120ml', 'Syrup', 'Oral', 'TDS', 'After meal', 2, 'tsp', 5, 'Bottle', 120, 280, 'Distributor B'],
             ['Moxiget Eye Drops', 'Moxifloxacin', 'Moxiget (Getz)', '0.5%', 'Drops', 'Ophthalmic', 'QID', 'As directed', 1, 'drop', 7, 'Bottle', 100, 220, 'Distributor A'],
         ];
         $freqByCode = ['OD' => 'Once a day', 'BD' => 'Twice a day', 'TDS' => 'Three times a day', 'QID' => 'Four times a day', 'HS' => 'At bedtime',
@@ -198,5 +209,9 @@ return static function (array $options = []): void {
                 'created_at'       => now(),
             ]);
         }
+
+        // ---- Department catalogs (services, stock, lab, imaging, dental …) ----
+        Seeder::modules();
+        Seeder::legacyUsers();
     });
 };

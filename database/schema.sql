@@ -11,6 +11,8 @@
 
 SET FOREIGN_KEY_CHECKS = 0;
 
+DROP TABLE IF EXISTS license_activations;
+DROP TABLE IF EXISTS license_issued;
 DROP TABLE IF EXISTS activity_logs;
 DROP TABLE IF EXISTS template_medicines;
 DROP TABLE IF EXISTS template_clinical_items;
@@ -64,6 +66,10 @@ CREATE TABLE departments (
     name          VARCHAR(150) NOT NULL,
     code          VARCHAR(20) NULL,
     description   VARCHAR(255) NULL,
+    branch_id       INT UNSIGNED NULL,
+    specialty_id    INT UNSIGNED NULL,
+    department_type VARCHAR(20) NOT NULL DEFAULT 'clinical',
+    head_user_id    INT UNSIGNED NULL,
     is_active     TINYINT(1) NOT NULL DEFAULT 1,
     display_order INT NOT NULL DEFAULT 0,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -73,7 +79,9 @@ CREATE TABLE departments (
     deleted_at    DATETIME NULL,
     deleted_by    INT UNSIGNED NULL,
     PRIMARY KEY (id),
-    KEY idx_departments_list (deleted_at, is_active, display_order)
+    KEY idx_departments_list (deleted_at, is_active, display_order),
+    KEY idx_departments_branch (branch_id),
+    KEY idx_departments_specialty (specialty_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE users (
@@ -85,7 +93,13 @@ CREATE TABLE users (
     mobile        VARCHAR(20) NULL,
     email         VARCHAR(150) NULL,
     cnic          VARCHAR(15) NULL,
-    role          ENUM('super_admin','dept_admin','doctor','reporting') NOT NULL,
+    -- User class (super_admin / dept_admin / doctor / reporting / staff). The
+    -- fine-grained rights come from user_role_branch -> roles -> role_permission.
+    role          VARCHAR(20) NOT NULL,
+    primary_role_id    INT UNSIGNED NULL,
+    two_factor_secret  VARCHAR(64) NULL,
+    two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    password_changed_at DATETIME NULL,
     is_active     TINYINT(1) NOT NULL DEFAULT 1,
     last_login_at DATETIME NULL,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -143,6 +157,8 @@ CREATE TABLE print_designs (
     show_prices        TINYINT(1) NOT NULL DEFAULT 1,
     show_billing       TINYINT(1) NOT NULL DEFAULT 1,
     show_signature     TINYINT(1) NOT NULL DEFAULT 1,
+    show_slogan        TINYINT(1) NOT NULL DEFAULT 1,
+    show_qr            TINYINT(1) NOT NULL DEFAULT 1,
     updated_at         DATETIME NULL,
     updated_by         INT UNSIGNED NULL,
     PRIMARY KEY (id),
@@ -160,6 +176,7 @@ CREATE TABLE medicine_sources (
     contact_person VARCHAR(100) NULL,
     contact_phone  VARCHAR(30) NULL,
     address        VARCHAR(255) NULL,
+    stock_location_id INT UNSIGNED NULL,
     is_active      TINYINT(1) NOT NULL DEFAULT 1,
     display_order  INT NOT NULL DEFAULT 0,
     created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -248,6 +265,7 @@ CREATE TABLE routes (
     id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
     name          VARCHAR(150) NOT NULL,
     short_name    VARCHAR(20) NULL,
+    name_ur       VARCHAR(150) NULL,
     is_active     TINYINT(1) NOT NULL DEFAULT 1,
     display_order INT NOT NULL DEFAULT 0,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -264,6 +282,7 @@ CREATE TABLE dosage_forms (
     id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
     name          VARCHAR(150) NOT NULL,
     short_name    VARCHAR(20) NULL,
+    dose_type     VARCHAR(20) NOT NULL DEFAULT 'other',
     is_active     TINYINT(1) NOT NULL DEFAULT 1,
     display_order INT NOT NULL DEFAULT 0,
     created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -282,6 +301,7 @@ CREATE TABLE frequencies (
     code          VARCHAR(20) NULL,
     doses_per_day DECIMAL(6,2) NOT NULL DEFAULT 1,
     calc_mode     ENUM('daily','weekly','manual') NOT NULL DEFAULT 'daily',
+    name_ur       VARCHAR(150) NULL,
     description   VARCHAR(255) NULL,
     is_active     TINYINT(1) NOT NULL DEFAULT 1,
     display_order INT NOT NULL DEFAULT 0,
@@ -298,6 +318,7 @@ CREATE TABLE frequencies (
 CREATE TABLE instructions (
     id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
     name          VARCHAR(150) NOT NULL,
+    name_ur       VARCHAR(150) NULL,
     description   VARCHAR(255) NULL,
     is_active     TINYINT(1) NOT NULL DEFAULT 1,
     display_order INT NOT NULL DEFAULT 0,
@@ -321,13 +342,21 @@ CREATE TABLE medicines (
     route_id         INT UNSIGNED NULL,
     frequency_id     INT UNSIGNED NULL,
     instruction_id   INT UNSIGNED NULL,
-    default_dose     DECIMAL(8,2) NOT NULL DEFAULT 1,
+    default_dose     DECIMAL(8,3) NOT NULL DEFAULT 1,
     dose_unit        VARCHAR(30) NULL,
     default_duration SMALLINT UNSIGNED NOT NULL DEFAULT 5,
     unit             VARCHAR(30) NULL,
     pack_size        DECIMAL(10,2) NOT NULL DEFAULT 1,
     price            DECIMAL(12,2) NOT NULL DEFAULT 0,
     source_id        INT UNSIGNED NULL,
+    -- v2: link to the stock item and the drug-master regulatory fields (Doc 7 §6.2)
+    item_id              INT UNSIGNED NULL,
+    drap_registration_no VARCHAR(40) NULL,
+    is_controlled        TINYINT(1) NOT NULL DEFAULT 0,
+    is_high_alert        TINYINT(1) NOT NULL DEFAULT 0,
+    is_lasa              TINYINT(1) NOT NULL DEFAULT 0,
+    is_formulary         TINYINT(1) NOT NULL DEFAULT 1,
+    pregnancy_category   VARCHAR(5) NULL,
     is_active        TINYINT(1) NOT NULL DEFAULT 1,
     display_order    INT NOT NULL DEFAULT 0,
     created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -356,7 +385,18 @@ CREATE TABLE medicines (
 CREATE TABLE patients (
     id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
     mrn           VARCHAR(50) NOT NULL,
-    doctor_id     INT UNSIGNED NOT NULL,
+    -- Doctor the patient was first registered for (MRN pattern). NULL when the
+    -- front desk registers a hospital patient with the chain-wide pattern.
+    doctor_id     INT UNSIGNED NULL,
+    registration_type      VARCHAR(30) NOT NULL DEFAULT 'normal',
+    mother_patient_id      INT UNSIGNED NULL,
+    merged_into_patient_id INT UNSIGNED NULL,
+    photo_path             VARCHAR(255) NULL,
+    occupation             VARCHAR(100) NULL,
+    marital_status         VARCHAR(20) NULL,
+    preferred_language     VARCHAR(5) NULL,
+    created_branch_id      INT UNSIGNED NULL,
+    is_deceased            TINYINT(1) NOT NULL DEFAULT 0,
     name          VARCHAR(150) NOT NULL,
     guardian_name VARCHAR(150) NULL,
     cnic          VARCHAR(15) NULL,
@@ -365,6 +405,7 @@ CREATE TABLE patients (
     dob           DATE NULL,
     dob_estimated TINYINT(1) NOT NULL DEFAULT 0,
     blood_group   VARCHAR(5) NULL,
+    allergies     VARCHAR(500) NULL,
     address       VARCHAR(255) NULL,
     city          VARCHAR(80) NULL,
     notes         TEXT NULL,
@@ -405,7 +446,9 @@ CREATE TABLE visits (
     resp_rate              SMALLINT UNSIGNED NULL,
     bmi                    DECIMAL(5,1) NULL,
     other_vitals           TEXT NULL,
+    allergies              VARCHAR(500) NULL,
     current_history        TEXT NULL,
+    findings               TEXT NULL,
     follow_up_date         DATE NULL,
     follow_up_instructions VARCHAR(500) NULL,
     consultation_fee       DECIMAL(12,2) NOT NULL DEFAULT 0,
@@ -419,9 +462,22 @@ CREATE TABLE visits (
     medicine_net           DECIMAL(12,2) NOT NULL DEFAULT 0,
     grand_total            DECIMAL(12,2) NOT NULL DEFAULT 0,
     overall_instructions   TEXT NULL,
+    refills                TINYINT UNSIGNED NOT NULL DEFAULT 0,
     rx_split_enabled       TINYINT(1) NOT NULL DEFAULT 0,
     rx_split_mode          VARCHAR(30) NULL,
     repeated_from_visit_id INT UNSIGNED NULL,
+    branch_id              INT UNSIGNED NULL,
+    department_id          INT UNSIGNED NULL,
+    visit_type_id          INT UNSIGNED NULL,
+    token_id               INT UNSIGNED NULL,
+    invoice_id             INT UNSIGNED NULL,
+    appointment_id         INT UNSIGNED NULL,
+    service_point_id       INT UNSIGNED NULL,
+    referred_by_type       VARCHAR(20) NULL,
+    referred_by_text       VARCHAR(150) NULL,
+    cosign_required        TINYINT(1) NOT NULL DEFAULT 0,
+    cosigned_by            INT UNSIGNED NULL,
+    cosigned_at            DATETIME NULL,
     template_id            INT UNSIGNED NULL,
     print_count            INT UNSIGNED NOT NULL DEFAULT 0,
     last_printed_at        DATETIME NULL,
@@ -438,6 +494,9 @@ CREATE TABLE visits (
     KEY idx_visits_doctor_date (doctor_id, visit_date),
     KEY idx_visits_patient (patient_id, visit_date),
     KEY idx_visits_followup (follow_up_date),
+    KEY idx_visits_dept (department_id, visit_date),
+    KEY idx_visits_token (token_id),
+    KEY idx_visits_invoice (invoice_id),
     KEY idx_visits_deleted (deleted_at),
     CONSTRAINT fk_visit_patient FOREIGN KEY (patient_id) REFERENCES patients (id),
     CONSTRAINT fk_visit_doctor FOREIGN KEY (doctor_id) REFERENCES users (id)
@@ -469,8 +528,9 @@ CREATE TABLE visit_medicines (
     generic_name   VARCHAR(150) NULL,
     strength       VARCHAR(50) NULL,
     dosage_form    VARCHAR(150) NULL,
-    dose           DECIMAL(8,2) NOT NULL DEFAULT 1,
+    dose           DECIMAL(8,3) NOT NULL DEFAULT 1,
     dose_unit      VARCHAR(30) NULL,
+    dose_type      VARCHAR(20) NULL,
     frequency_id   INT UNSIGNED NULL,
     frequency_name VARCHAR(150) NULL,
     frequency_code VARCHAR(20) NULL,
@@ -487,6 +547,8 @@ CREATE TABLE visit_medicines (
     source_id      INT UNSIGNED NULL,
     source_name    VARCHAR(150) NULL,
     rx_group       SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    is_main_rx     TINYINT(1) NOT NULL DEFAULT 1,
+    billable       TINYINT(1) NOT NULL DEFAULT 1,
     instructions   VARCHAR(255) NULL,
     sort_order     SMALLINT UNSIGNED NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
@@ -538,7 +600,7 @@ CREATE TABLE template_medicines (
     template_id   INT UNSIGNED NOT NULL,
     medicine_id   INT UNSIGNED NULL,
     medicine_name VARCHAR(150) NOT NULL,
-    dose          DECIMAL(8,2) NOT NULL DEFAULT 1,
+    dose          DECIMAL(8,3) NOT NULL DEFAULT 1,
     dose_unit     VARCHAR(30) NULL,
     frequency_id  INT UNSIGNED NULL,
     route_id      INT UNSIGNED NULL,
@@ -561,11 +623,15 @@ CREATE TABLE activity_logs (
     id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id     INT UNSIGNED NULL,
     username    VARCHAR(60) NULL,
-    role        VARCHAR(20) NULL,
+    role        VARCHAR(30) NULL,
     action      VARCHAR(80) NOT NULL,
     module      VARCHAR(50) NULL,
     record_id   VARCHAR(50) NULL,
     description VARCHAR(500) NULL,
+    branch_id   INT UNSIGNED NULL,
+    entity_type VARCHAR(60) NULL,
+    old_value   LONGTEXT NULL,
+    new_value   LONGTEXT NULL,
     ip_address  VARCHAR(45) NULL,
     user_agent  VARCHAR(255) NULL,
     created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -574,4 +640,36 @@ CREATE TABLE activity_logs (
     KEY idx_logs_user (user_id, created_at),
     KEY idx_logs_action (action),
     KEY idx_logs_module (module)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+--  Subscription keys: issued (vendor installation) and activated (every install)
+-- ---------------------------------------------------------------------------
+CREATE TABLE license_issued (
+    id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    phone        VARCHAR(20) NOT NULL,
+    clinic_name  VARCHAR(150) NULL,
+    from_date    DATE NOT NULL,
+    to_date      DATE NOT NULL,
+    amount       DECIMAL(12,2) NOT NULL DEFAULT 0,
+    payment_ref  VARCHAR(100) NULL,
+    notes        VARCHAR(500) NULL,
+    license_key  TEXT NOT NULL,
+    issued_by    INT UNSIGNED NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_li_phone (phone),
+    KEY idx_li_dates (to_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE license_activations (
+    id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    phone        VARCHAR(20) NOT NULL,
+    from_date    DATE NOT NULL,
+    to_date      DATE NOT NULL,
+    license_key  TEXT NOT NULL,
+    activated_by INT UNSIGNED NULL,
+    activated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_la_date (activated_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

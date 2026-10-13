@@ -49,6 +49,57 @@ final class ClinicalItems
     }
 
     /**
+     * "Trending" quick picks: the items this doctor used most (all doctors when
+     * $doctorId is null), top $limit by count, topped up from the master list
+     * so a new doctor still sees suggestions.
+     * @return array<string, array<int, array{id:?int, name:string, code:string, count:int}>> keyed complaints|symptoms|diagnoses|investigations
+     */
+    public static function trending(?int $doctorId, int $limit = 20): array
+    {
+        $out = [];
+        foreach (self::TYPES as $type => [$table, $key, $label, $freeText]) {
+            $params = [$type];
+            $where = 'i.item_type = ? AND v.deleted_at IS NULL';
+            if ($doctorId) {
+                $where .= ' AND v.doctor_id = ?';
+                $params[] = $doctorId;
+            }
+            $rows = DB::all(
+                'SELECT MAX(i.ref_id) AS id, i.name, MAX(i.code) AS code, COUNT(*) AS cnt
+                   FROM visit_clinical_items i JOIN visits v ON v.id = i.visit_id
+                  WHERE ' . $where . ' GROUP BY i.name ORDER BY cnt DESC, i.name LIMIT ' . $limit,
+                $params
+            );
+            $items = [];
+            $seen = [];
+            foreach ($rows as $r) {
+                // Master items must still exist; free text only where free text is allowed.
+                if ($r['id'] && !DB::value('SELECT 1 FROM ' . $table . ' WHERE id = ? AND deleted_at IS NULL AND is_active = 1', [$r['id']])) {
+                    continue;
+                }
+                if (!$r['id'] && !$freeText) {
+                    continue;
+                }
+                $items[] = ['id' => $r['id'] ? (int) $r['id'] : null, 'name' => $r['name'], 'code' => (string) ($r['code'] ?? ''), 'count' => (int) $r['cnt']];
+                $seen[mb_strtolower($r['name'])] = true;
+            }
+            if (count($items) < $limit) {
+                foreach (self::lookup($type, '', 50) as $m) {
+                    if (count($items) >= $limit) {
+                        break;
+                    }
+                    if (!isset($seen[mb_strtolower($m['name'])])) {
+                        $items[] = $m + ['count' => 0];
+                        $seen[mb_strtolower($m['name'])] = true;
+                    }
+                }
+            }
+            $out[$key] = $items;
+        }
+        return $out;
+    }
+
+    /**
      * Validates the four lists from a payload and resolves master names.
      * @return array{0: array<int, array{item_type:string, ref_id:?int, name:string, code:?string}>, 1: string[]}
      */

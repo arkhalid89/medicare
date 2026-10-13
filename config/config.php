@@ -28,7 +28,7 @@ return [
     'app' => [
         'name'            => $env('APP_NAME', 'MediCare Practice'),
         'short_name'      => 'MediCare',
-        'version'         => '1.0.0',
+        'version'         => '2.0.0',
         'base_url'        => $env('APP_BASE_URL', 'http://localhost/medicare-practice/public'),
         // true  => http://host/base/patients/edit?id=5   (needs mod_rewrite, .htaccess is supplied)
         // false => http://host/base/index.php?r=patients/edit&id=5   (works everywhere)
@@ -50,10 +50,12 @@ return [
     ],
 
     'security' => [
-        // 'plain'  => passwords are stored as typed (current requirement).
-        // 'bcrypt' => passwords are hashed. Switching is safe: plain-text
-        //             passwords keep working and are upgraded at next login.
-        'password_mode'       => 'plain',
+        // 'bcrypt' => passwords are hashed (default since v2 — required once
+        //             the app is reachable over the hospital LAN).
+        // 'plain'  => passwords stored as typed (v1 behaviour). Switching is
+        //             safe: plain-text passwords keep working and are hashed
+        //             automatically at the next login.
+        'password_mode'       => $env('PASSWORD_MODE', 'bcrypt'),
         'min_password_length' => 6,
     ],
 

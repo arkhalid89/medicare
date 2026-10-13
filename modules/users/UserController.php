@@ -10,12 +10,13 @@ use App\Core\Controller;
 use App\Core\DB;
 use App\Core\Paginator;
 use App\Core\Password;
+use App\Core\Rbac;
 use App\Core\Validator;
 
 /**
- * User management (BRD §27): create, edit, roles, multiple departments,
- * doctor profile & MRN pattern, activate/deactivate, reset password,
- * soft delete (Super Admin), Excel export.
+ * User management (BRD §27, Doc 1 §1 note, Doc 8 §6): account, one or more
+ * roles per branch and department, department membership, doctor profile &
+ * MRN pattern, activate/deactivate, reset password, soft delete, Excel.
  */
 final class UserController extends Controller
 {
@@ -24,18 +25,21 @@ final class UserController extends Controller
         [$where, $params, $filters] = $this->filters();
         $base = ' FROM users u LEFT JOIN doctor_profiles dp ON dp.user_id = u.id WHERE ' . $where;
         $select = "SELECT u.id, u.employee_code, u.name, u.username, u.mobile, u.email, u.cnic, u.role, u.is_active, u.last_login_at, u.created_at,
-                          dp.specialization, dp.pmdc_registration,
+                          u.two_factor_enabled, dp.specialization, dp.pmdc_registration,
                           (SELECT GROUP_CONCAT(d.name ORDER BY d.display_order, d.name SEPARATOR ', ')
                              FROM user_departments ud JOIN departments d ON d.id = ud.department_id AND d.deleted_at IS NULL
-                            WHERE ud.user_id = u.id) AS departments";
-        $order = " ORDER BY FIELD(u.role, 'super_admin', 'dept_admin', 'doctor', 'reporting'), u.name";
+                            WHERE ud.user_id = u.id) AS departments,
+                          (SELECT GROUP_CONCAT(DISTINCT r.name ORDER BY x.is_primary DESC, r.name SEPARATOR ', ')
+                             FROM user_role_branch x JOIN roles r ON r.id = x.role_id WHERE x.user_id = u.id) AS roles";
+        $order = " ORDER BY FIELD(u.role, 'super_admin', 'dept_admin', 'doctor', 'reporting', 'staff'), u.name";
 
         if ($this->wantsExport()) {
             $this->export('users', 'Users', [
                 'employee_code' => 'Employee Code',
                 'name'          => 'Name',
                 'username'      => 'Username',
-                'role'          => ['Role', static fn ($r) => role_label($r['role'])],
+                'role'          => ['User Type', static fn ($r) => role_label($r['role'])],
+                'roles'         => 'Roles',
                 'departments'   => 'Departments',
                 'mobile'        => 'Mobile',
                 'email'         => 'Email',
@@ -53,6 +57,7 @@ final class UserController extends Controller
             'rows'        => DB::all($select . $base . $order . $pager->limitSql(), $params),
             'pager'       => $pager,
             'departments' => $this->departmentOptions(),
+            'roles'       => DB::pairs('SELECT code, name FROM roles WHERE deleted_at IS NULL ORDER BY tier, display_order, name'),
             'canManage'   => can('users.manage'),
             'canDelete'   => can('records.delete'),
         ]);
@@ -71,7 +76,10 @@ final class UserController extends Controller
             [$id]
         ) : null;
         $activity = DB::all('SELECT action, description, created_at FROM activity_logs WHERE user_id = ? ORDER BY id DESC LIMIT 10', [$id]);
-        $this->view('users/view', ['title' => $user['name'], 'u' => $user, 'departments' => $departments, 'stats' => $stats, 'activity' => $activity]);
+        $this->view('users/view', [
+            'title' => $user['name'], 'u' => $user, 'departments' => $departments, 'stats' => $stats, 'activity' => $activity,
+            'assignments' => Rbac::assignments($id),
+        ]);
     }
 
     public function form(): void
@@ -79,20 +87,28 @@ final class UserController extends Controller
         $id = (int) input('id', 0);
         $user = null;
         $userDepartments = [];
+        $assignments = [];
         if ($id > 0) {
             $user = DB::one('SELECT u.*, dp.pmdc_registration, dp.qualification, dp.specialization, dp.mrn_pattern, dp.default_fee, dp.signature_text
                                FROM users u LEFT JOIN doctor_profiles dp ON dp.user_id = u.id WHERE u.id = ? AND u.deleted_at IS NULL', [$id]);
             if (!$user) {
                 abort(404, 'User not found.');
             }
+            $this->findVisible($id);
             $userDepartments = array_map('intval', DB::column('SELECT department_id FROM user_departments WHERE user_id = ?', [$id]));
+            foreach (Rbac::assignments($id) as $a) {
+                $assignments[] = ['role_id' => (int) $a['role_id'], 'branch_id' => $a['branch_id'] !== null ? (int) $a['branch_id'] : null,
+                    'department_id' => $a['department_id'] !== null ? (int) $a['department_id'] : null, 'is_primary' => (bool) $a['is_primary']];
+            }
         }
 
         $errors = [];
         if (is_post()) {
-            [$data, $profile, $departments, $errors] = $this->validate($_POST, $user);
+            [$data, $profile, $departments, $rows, $errors] = $this->validate($_POST, $user);
+            $assignments = $rows;
             if (!$errors) {
-                $id = DB::transaction(function () use ($user, $data, $profile, $departments): int {
+                $id = DB::transaction(function () use ($user, $data, $profile, $departments, $rows): int {
+                    $primaryCode = (string) DB::value('SELECT code FROM roles WHERE id = ?', [array_values(array_filter($rows, static fn ($r) => $r['is_primary']))[0]['role_id'] ?? $rows[0]['role_id']]);
                     if ($user) {
                         $id = (int) $user['id'];
                         DB::update('users', $data + ['updated_at' => now(), 'updated_by' => Auth::id()], 'id = ?', [$id]);
@@ -101,13 +117,20 @@ final class UserController extends Controller
                             ActivityLog::record('Password reset', 'users', (string) $id, 'Password changed for ' . $data['username']);
                         }
                     } else {
-                        $data['employee_code'] = UserService::nextEmployeeCode($data['role'], $departments);
+                        $data['employee_code'] = UserService::nextEmployeeCode($data['role'], $departments, $primaryCode);
                         $id = DB::insert('users', $data + ['created_at' => now(), 'created_by' => Auth::id()]);
                         ActivityLog::record('User created', 'users', (string) $id, 'Created user ' . $data['username'] . ' (' . role_label($data['role']) . ', ' . $data['employee_code'] . ')');
                     }
                     DB::run('DELETE FROM user_departments WHERE user_id = ?', [$id]);
                     foreach ($departments as $deptId) {
                         DB::insert('user_departments', ['user_id' => $id, 'department_id' => $deptId]);
+                    }
+                    $before = $user ? array_map(static fn ($a) => $a['role_code'] . '@' . ($a['branch_name'] ?? 'all') . '/' . ($a['department_name'] ?? 'all'), Rbac::assignments($id)) : [];
+                    UserService::saveAssignments($id, $rows);
+                    $after = array_map(static fn ($a) => $a['role_code'] . '@' . ($a['branch_name'] ?? 'all') . '/' . ($a['department_name'] ?? 'all'), Rbac::assignments($id));
+                    if ($before !== $after) {
+                        ActivityLog::record('Roles changed', 'users', (string) $id, 'Roles of ' . $data['username'] . ': ' . implode(', ', $after), null, null,
+                            ['entity' => 'users', 'old' => $before, 'new' => $after]);
                     }
                     if ($data['role'] === 'doctor') {
                         UserService::ensureDoctorSetup($id);
@@ -125,6 +148,9 @@ final class UserController extends Controller
             'user'            => $user,
             'userDepartments' => is_post() ? array_map('intval', (array) ($_POST['departments'] ?? [])) : $userDepartments,
             'departments'     => $this->departmentOptions(),
+            'branches'        => DB::pairs('SELECT id, name FROM branches WHERE deleted_at IS NULL AND is_active = 1 ORDER BY display_order, name'),
+            'roles'           => UserService::assignableRoles(),
+            'assignments'     => $assignments,
             'errors'          => array_values($errors),
             'fieldErrors'     => $errors,
             'nextCode'        => CodeGenerator::preview('emp', (string) setting('employee_code_pattern'), ['DEPT' => 'DEPT', 'ROLE' => 'XX']),
@@ -138,6 +164,7 @@ final class UserController extends Controller
         if (!$user) {
             abort(404);
         }
+        $this->findVisible($id);
         if ($id === Auth::id()) {
             flash('error', 'You cannot deactivate your own account.');
             back('users');
@@ -160,14 +187,30 @@ final class UserController extends Controller
         if (!$user) {
             abort(404);
         }
+        $this->findVisible($id);
         $password = (string) ($_POST['new_password'] ?? '');
         if (mb_strlen($password) < Password::minLength() || mb_strlen($password) > 100) {
             flash('error', 'Password must be ' . Password::minLength() . ' to 100 characters.');
             back('users');
         }
-        DB::update('users', ['password' => Password::hash($password), 'updated_at' => now(), 'updated_by' => Auth::id()], 'id = ?', [$id]);
+        DB::update('users', ['password' => Password::hash($password), 'password_changed_at' => now(), 'updated_at' => now(), 'updated_by' => Auth::id()], 'id = ?', [$id]);
         ActivityLog::record('Password reset', 'users', (string) $id, 'Password reset for ' . $user['username']);
         flash('success', 'Password for "' . $user['name'] . '" has been reset.');
+        back('users');
+    }
+
+    /** Clears a user's authenticator (lost phone). */
+    public function resetTwoFactor(): void
+    {
+        $id = $this->requireId();
+        $user = DB::one('SELECT id, name, username FROM users WHERE id = ? AND deleted_at IS NULL', [$id]);
+        if (!$user) {
+            abort(404);
+        }
+        $this->findVisible($id);
+        DB::update('users', ['two_factor_enabled' => 0, 'two_factor_secret' => null, 'updated_at' => now(), 'updated_by' => Auth::id()], 'id = ?', [$id]);
+        ActivityLog::record('2FA reset', 'users', (string) $id, 'Two-factor authentication cleared for ' . $user['username']);
+        flash('success', 'Two-factor authentication of "' . $user['name'] . '" was cleared. They can set it up again at next login.');
         back('users');
     }
 
@@ -204,9 +247,8 @@ final class UserController extends Controller
         $status = (string) input('status', '');
         $dept = (int) input('department', 0);
 
-        $me = Auth::user();
-        if ($me['role'] === 'dept_admin') {
-            $ids = $me['department_ids'] ?: [0];
+        if (Auth::scope('users.view') === 'department') {
+            $ids = Auth::user()['department_ids'] ?: [0];
             $where .= ' AND EXISTS (SELECT 1 FROM user_departments x WHERE x.user_id = u.id AND x.department_id IN (' . DB::placeholders($ids) . '))';
             array_push($params, ...$ids);
         }
@@ -215,20 +257,26 @@ final class UserController extends Controller
             $where .= ' AND (u.name LIKE ? OR u.username LIKE ? OR u.employee_code LIKE ? OR u.mobile LIKE ? OR u.cnic LIKE ?)';
             array_push($params, $like, $like, $like, $like, $like);
         }
-        if (isset(config('permissions.roles')[$role])) {
+        $roleName = '';
+        if ($role !== '' && ($roleName = (string) DB::value('SELECT name FROM roles WHERE code = ?', [$role])) !== '') {
+            $where .= ' AND EXISTS (SELECT 1 FROM user_role_branch z JOIN roles zr ON zr.id = z.role_id WHERE z.user_id = u.id AND zr.code = ?)';
+            $params[] = $role;
+        } elseif (isset(config('permissions.classes')[$role])) {
             $where .= ' AND u.role = ?';
             $params[] = $role;
+            $roleName = role_label($role);
         }
         if ($status === 'active' || $status === 'inactive') {
             $where .= ' AND u.is_active = ?';
             $params[] = $status === 'active' ? 1 : 0;
         }
         if ($dept > 0) {
-            $where .= ' AND EXISTS (SELECT 1 FROM user_departments y WHERE y.user_id = u.id AND y.department_id = ?)';
-            $params[] = $dept;
+            $where .= ' AND (EXISTS (SELECT 1 FROM user_departments y WHERE y.user_id = u.id AND y.department_id = ?)
+                         OR EXISTS (SELECT 1 FROM user_role_branch y2 WHERE y2.user_id = u.id AND y2.department_id = ?))';
+            array_push($params, $dept, $dept);
         }
         $deptName = $dept ? ($this->departmentOptions()[$dept] ?? '') : '';
-        return [$where, $params, ['Search' => $q, 'Role' => $role ? role_label($role) : '', 'Status' => ucfirst($status), 'Department' => $deptName]];
+        return [$where, $params, ['Search' => $q, 'Role' => $roleName, 'Status' => ucfirst($status), 'Department' => $deptName]];
     }
 
     private function findVisible(int $id): array
@@ -238,12 +286,16 @@ final class UserController extends Controller
         if (!$user) {
             abort(404, 'User not found.');
         }
-        $me = Auth::user();
-        if ($me['role'] === 'dept_admin') {
-            $shared = array_intersect($me['department_ids'], array_map('intval', DB::column('SELECT department_id FROM user_departments WHERE user_id = ?', [$id])));
+        if (Auth::scope('users.view') === 'department') {
+            $shared = array_intersect(Auth::user()['department_ids'], array_map('intval', DB::column('SELECT department_id FROM user_departments WHERE user_id = ?', [$id])));
             if (!$shared) {
                 abort(403);
             }
+        }
+        // Only role administrators may edit a chain-level account (SA / ITA / AUD).
+        if (!can('roles.manage') && DB::value("SELECT 1 FROM user_role_branch x JOIN roles r ON r.id = x.role_id WHERE x.user_id = ? AND r.tier = 'A'", [$id])
+            && in_array(\App\Core\Router::current(), ['users/form', 'users/toggle', 'users/password', 'users/2fa-reset'], true)) {
+            abort(403);
         }
         return $user;
     }
@@ -253,14 +305,12 @@ final class UserController extends Controller
         return array_map('strval', DB::pairs('SELECT id, name FROM departments WHERE deleted_at IS NULL ORDER BY is_active DESC, display_order, name'));
     }
 
-    /** @return array{0: array, 1: array, 2: int[], 3: array} */
+    /** @return array{0: array, 1: array, 2: int[], 3: array, 4: array} */
     private function validate(array $in, ?array $existing): array
     {
-        $roles = array_keys(config('permissions.roles'));
         $v = new Validator($in);
         $v->required('name', 'Name')->max('name', 'Name', 150)
             ->required('username', 'Username')->max('username', 'Username', 60)
-            ->required('role', 'Role')->in('role', 'Role', $roles)
             ->phone('mobile', 'Mobile')->email('email', 'Email')->max('email', 'Email', 150)
             ->cnic('cnic', 'CNIC');
 
@@ -281,29 +331,76 @@ final class UserController extends Controller
             }
         }
 
-        $role = (string) ($in['role'] ?? '');
+        // ---- Role assignments ------------------------------------------------
+        $allowed = [];
+        foreach (UserService::assignableRoles() as $group) {
+            foreach ($group as $r) {
+                $allowed[$r['id']] = $r;
+            }
+        }
+        $branches = array_map('intval', array_keys(DB::pairs('SELECT id, name FROM branches WHERE deleted_at IS NULL')));
+        $validDepts = array_map('intval', array_keys($this->departmentOptions()));
+        $rows = [];
+        $seen = [];
+        $primaryIdx = (int) ($in['primary'] ?? 0);
+        foreach (array_values((array) ($in['assign'] ?? [])) as $i => $a) {
+            $roleId = (int) ($a['role_id'] ?? 0);
+            if ($roleId <= 0) {
+                continue;
+            }
+            $existingRow = $existing ? (bool) DB::value('SELECT 1 FROM user_role_branch WHERE user_id = ? AND role_id = ?', [$existing['id'], $roleId]) : false;
+            if (!isset($allowed[$roleId]) && !$existingRow) {
+                $v->add('assign', 'You are not allowed to assign one of the selected roles.');
+                continue;
+            }
+            $branchRaw = (string) ($a['branch_id'] ?? '');
+            $branchId = $branchRaw === '' ? null : (int) $branchRaw;
+            if ($branchId !== null && !in_array($branchId, $branches, true)) {
+                $branchId = null;
+            }
+            $deptRaw = (string) ($a['department_id'] ?? '');
+            $deptId = $deptRaw === '' ? null : (int) $deptRaw;
+            if ($deptId !== null && !in_array($deptId, $validDepts, true)) {
+                $deptId = null;
+            }
+            $key = $roleId . ':' . (int) $branchId . ':' . (int) $deptId;
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $rows[] = ['role_id' => $roleId, 'branch_id' => $branchId, 'department_id' => $deptId, 'is_primary' => $i === $primaryIdx];
+        }
+        if (!$rows) {
+            $v->add('assign', 'Assign at least one role.');
+        } elseif (!array_filter($rows, static fn ($r) => $r['is_primary'])) {
+            $rows[0]['is_primary'] = true;
+        }
+        $roleIds = array_column($rows, 'role_id');
+        $primaryId = $rows ? (int) (array_values(array_filter($rows, static fn ($r) => $r['is_primary']))[0]['role_id'] ?? $rows[0]['role_id']) : null;
+        $class = $rows ? UserService::classFor($roleIds, $primaryId) : 'staff';
+
         $isActive = !empty($in['is_active']) ? 1 : 0;
         if ($existing && (int) $existing['id'] === Auth::id()) {
-            if ($role !== $existing['role']) {
-                $v->add('role', 'You cannot change your own role.');
+            if ($class !== $existing['role']) {
+                $v->add('assign', 'You cannot change your own user type (e.g. remove your own Super Admin role).');
             }
             if (!$isActive) {
                 $v->add('is_active', 'You cannot deactivate your own account.');
             }
         }
-        if ($existing && $existing['role'] === 'super_admin' && ($role !== 'super_admin' || !$isActive)
+        if ($existing && $existing['role'] === 'super_admin' && ($class !== 'super_admin' || !$isActive)
             && UserService::otherActiveSuperAdmins((int) $existing['id']) === 0) {
-            $v->add('role', 'This is the last active Super Admin; keep the role and status.');
+            $v->add('assign', 'This is the last active Super Admin; keep the Super Admin role and status.');
         }
 
-        $valid = array_map('intval', array_keys($this->departmentOptions()));
-        $departments = array_values(array_unique(array_filter(array_map('intval', (array) ($in['departments'] ?? [])), static fn ($d) => in_array($d, $valid, true))));
-        if ($role === 'dept_admin' && !$departments) {
+        $departments = array_values(array_unique(array_filter(array_map('intval', (array) ($in['departments'] ?? [])), static fn ($d) => in_array($d, $validDepts, true))));
+        $hasDa = (bool) array_filter($roleIds, static fn ($id) => (\App\Core\Rbac::role((int) $id)['code'] ?? '') === 'DA');
+        if ($hasDa && !$departments) {
             $v->add('departments', 'Assign at least one department to a Department Admin.');
         }
 
         $profile = [];
-        if ($role === 'doctor') {
+        if ($class === 'doctor') {
             $v->max('pmdc_registration', 'PMDC registration', 50)->max('qualification', 'Qualification', 255)
                 ->max('specialization', 'Specialization', 150)->numeric('default_fee', 'Default fee', 0, 10000000)
                 ->max('signature_text', 'Signature text', 255);
@@ -327,12 +424,13 @@ final class UserController extends Controller
             'mobile'    => normalize_phone((string) ($in['mobile'] ?? '')),
             'email'     => trim((string) ($in['email'] ?? '')) ?: null,
             'cnic'      => normalize_cnic((string) ($in['cnic'] ?? '')),
-            'role'      => $role,
+            'role'      => $class,
             'is_active' => $isActive,
         ];
         if ($password !== '') {
             $data['password'] = Password::hash($password);
+            $data['password_changed_at'] = now();
         }
-        return [$data, $profile, $departments, $v->errors()];
+        return [$data, $profile, $departments, $rows, $v->errors()];
     }
 }

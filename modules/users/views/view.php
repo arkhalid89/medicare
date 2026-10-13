@@ -1,5 +1,5 @@
 <?php
-/** @var array $u @var array $departments @var array|null $stats @var array $activity */
+/** @var array $u @var array $departments @var array|null $stats @var array $activity @var array $assignments */
 use App\Core\View;
 
 $actions = '';
@@ -30,7 +30,14 @@ echo View::partial('page_header', [
             <dl class="kv">
                 <dt>Employee Code</dt><dd><code><?= e($u['employee_code']) ?></code></dd>
                 <dt>Username</dt><dd><?= e($u['username']) ?></dd>
-                <dt>Role</dt><dd><?= e(role_label($u['role'])) ?></dd>
+                <dt>User Type</dt><dd><?= e(role_label($u['role'])) ?></dd>
+                <dt>Roles</dt><dd><?php foreach ($assignments as $a): ?><div><span class="badge <?= (int) $a['is_primary'] ? 'badge-primary' : 'badge-muted' ?>"><?= e($a['role_name']) ?></span>
+                    <span class="muted small"><?= e($a['branch_name'] ?? 'All branches') ?> · <?= e($a['department_name'] ?? 'Whole branch') ?></span></div><?php endforeach; ?><?= $assignments ? '' : '—' ?></dd>
+                <dt>Two-factor</dt><dd><?= (int) $u['two_factor_enabled'] ? '<span class="badge badge-success">On</span>' : 'Off' ?>
+                    <?php if ((int) $u['two_factor_enabled'] && can('users.manage')): ?>
+                        <form method="post" action="<?= e(url('users/2fa-reset')) ?>" style="display:inline" data-confirm="Clear the authenticator of <?= e($u['name']) ?>? Use this when the phone is lost." data-confirm-ok="Clear 2FA">
+                            <?= csrf_field() ?><input type="hidden" name="id" value="<?= (int) $u['id'] ?>"><button class="btn btn-sm btn-ghost">Reset</button></form>
+                    <?php endif; ?></dd>
                 <dt>Departments</dt><dd><?= $departments ? e(implode(', ', $departments)) : '—' ?></dd>
                 <dt>Mobile</dt><dd><?= e($u['mobile']) ?: '—' ?></dd>
                 <dt>Email</dt><dd><?= e($u['email']) ?: '—' ?></dd>

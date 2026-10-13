@@ -1,5 +1,5 @@
 <?php
-/** @var array $rows @var \App\Core\Paginator $pager @var array $departments @var bool $canManage @var bool $canDelete */
+/** @var array $rows @var \App\Core\Paginator $pager @var array $departments @var array $roles @var bool $canManage @var bool $canDelete */
 use App\Core\Password;
 use App\Core\View;
 
@@ -9,11 +9,11 @@ if ($canManage) {
 }
 echo View::partial('page_header', [
     'title'       => 'Users',
-    'description' => 'Super Admins, Department Admins, Doctors and Reporting users.',
+    'description' => 'Staff accounts with their roles per branch and department.',
     'breadcrumbs' => [['Administration'], ['Users']],
     'actions'     => $actions,
 ]);
-$roleBadge = ['super_admin' => 'badge-danger', 'dept_admin' => 'badge-gold', 'doctor' => 'badge-primary', 'reporting' => 'badge-info'];
+$roleBadge = ['super_admin' => 'badge-danger', 'dept_admin' => 'badge-gold', 'doctor' => 'badge-primary', 'reporting' => 'badge-info', 'staff' => 'badge-muted'];
 ?>
 <div class="card card-flush">
     <div class="card-header">
@@ -22,7 +22,8 @@ $roleBadge = ['super_admin' => 'badge-danger', 'dept_admin' => 'badge-gold', 'do
             <div class="field grow"><label>Search</label><input class="input" type="search" name="q" value="<?= e(input('q', '')) ?>" placeholder="Name, username, code, mobile, CNIC…"></div>
             <div class="field"><label>Role</label>
                 <select class="input" name="role"><option value="">All roles</option>
-                    <?php foreach (config('permissions.roles') as $key => $r): ?><option value="<?= e($key) ?>"<?= selected($key, input('role', '')) ?>><?= e($r['label']) ?></option><?php endforeach; ?>
+                    <optgroup label="User type"><?php foreach (config('permissions.classes') as $key => $label): ?><option value="<?= e($key) ?>"<?= selected($key, input('role', '')) ?>><?= e($label) ?></option><?php endforeach; ?></optgroup>
+                    <optgroup label="Role"><?php foreach ($roles as $code => $name): ?><option value="<?= e($code) ?>"<?= selected($code, input('role', '')) ?>><?= e($name) ?></option><?php endforeach; ?></optgroup>
                 </select>
             </div>
             <div class="field"><label>Department</label>
@@ -41,7 +42,7 @@ $roleBadge = ['super_admin' => 'badge-danger', 'dept_admin' => 'badge-gold', 'do
             <div class="empty"><?= icon('users') ?><strong>No users found</strong></div>
         <?php else: ?>
         <table class="table">
-            <thead><tr><th>Code</th><th>Name</th><th>Username</th><th>Role</th><th>Departments</th><th>Mobile</th><th>Status</th><th>Last Login</th><th style="width:1%">Actions</th></tr></thead>
+            <thead><tr><th>Code</th><th>Name</th><th>Username</th><th>Type / Roles</th><th>Departments</th><th>Mobile</th><th>Status</th><th>Last Login</th><th style="width:1%">Actions</th></tr></thead>
             <tbody>
             <?php foreach ($rows as $r): ?>
                 <tr>
@@ -49,7 +50,8 @@ $roleBadge = ['super_admin' => 'badge-danger', 'dept_admin' => 'badge-gold', 'do
                     <td><a href="<?= e(url('users/view', ['id' => $r['id']])) ?>"><strong><?= e($r['name']) ?></strong></a>
                         <?php if ($r['specialization']): ?><div class="muted small"><?= e($r['specialization']) ?></div><?php endif; ?></td>
                     <td><?= e($r['username']) ?></td>
-                    <td><span class="badge <?= $roleBadge[$r['role']] ?? '' ?>"><?= e(role_label($r['role'])) ?></span></td>
+                    <td><span class="badge <?= $roleBadge[$r['role']] ?? '' ?>"><?= e(role_label($r['role'])) ?></span><?php if ((int) $r['two_factor_enabled']): ?> <span class="badge badge-success" title="Two-factor login on">2FA</span><?php endif; ?>
+                        <?php if ($r['roles']): ?><div class="muted small"><?= e($r['roles']) ?></div><?php endif; ?></td>
                     <td class="small"><?= $r['departments'] ? e($r['departments']) : '<span class="muted">—</span>' ?></td>
                     <td class="nowrap"><?= e($r['mobile']) ?></td>
                     <td><?= status_badge($r['is_active']) ?></td>

@@ -98,19 +98,19 @@ final class CodeGenerator
      * Issues the next code.
      * @param callable $exists fn(string $code): bool — true if already used
      */
-    public static function next(string $scope, string $pattern, callable $exists, array $vars = []): string
+    public static function next(string $scope, string $pattern, callable $exists, array $vars = [], ?int $time = null): string
     {
         if (!self::hasSequence($pattern)) {
             throw new \InvalidArgumentException('Code pattern "' . $pattern . '" has no sequence token.');
         }
-        return DB::transaction(static function () use ($scope, $pattern, $exists, $vars): string {
-            $key = $scope . ':' . self::periodKey($pattern);
+        return DB::transaction(static function () use ($scope, $pattern, $exists, $vars, $time): string {
+            $key = $scope . ':' . self::periodKey($pattern, $time);
             DB::run('INSERT IGNORE INTO counters (counter_key, last_value) VALUES (?, 0)', [$key]);
             $n = (int) DB::value('SELECT last_value FROM counters WHERE counter_key = ? FOR UPDATE', [$key]);
             $code = '';
             for ($guard = 0; $guard < 1000000; $guard++) {
                 $n++;
-                $code = self::render($pattern, $n, $vars);
+                $code = self::render($pattern, $n, $vars, $time);
                 if (!$exists($code)) {
                     break;
                 }

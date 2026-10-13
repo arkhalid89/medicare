@@ -43,7 +43,7 @@ echo View::partial('page_header', [
                     <td class="nowrap"><a href="<?= e(url('patients/view', ['id' => $r['id']])) ?>"><strong><?= e($r['mrn']) ?></strong></a></td>
                     <td><strong><?= e($r['name']) ?></strong><?php if ($r['guardian_name']): ?><div class="muted small">s/o, d/o, w/o <?= e($r['guardian_name']) ?></div><?php endif; ?></td>
                     <td class="nowrap"><?= e($r['gender']) ?><?= $r['dob'] ? ' · ' . e(age_text($r['dob'])) : '' ?></td>
-                    <td class="nowrap"><?= e($r['cnic']) ?></td>
+                    <td class="nowrap"><?= e(cnic_mask($r['cnic'])) ?></td>
                     <td class="nowrap"><?= e($r['phone']) ?></td>
                     <td><?= e($r['city']) ?></td>
                     <td class="num"><?= (int) $r['visit_count'] ?></td>

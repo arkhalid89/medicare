@@ -9,7 +9,9 @@ $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, Filesy
 $failed = 0;
 $count = 0;
 foreach ($it as $file) {
-    if ($file->getExtension() !== 'php' || str_contains($file->getPathname(), DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR)) {
+    $path = $file->getPathname();
+    if ($file->getExtension() !== 'php' || str_contains($path, DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR)
+        || str_contains($path, DIRECTORY_SEPARATOR . 'installer' . DIRECTORY_SEPARATOR)) {
         continue;
     }
     $count++;

@@ -7,6 +7,7 @@ use App\Core\ActivityLog;
 use App\Core\Auth;
 use App\Core\Backup;
 use App\Core\Controller;
+use App\Core\DataPurger;
 use App\Core\DB;
 use App\Core\Installer;
 use App\Core\Logger;
@@ -173,6 +174,52 @@ final class SystemController extends Controller
         $this->view('system/reset', ['title' => 'Database Reset', 'errors' => $errors, 'counts' => $counts]);
     }
 
+    /** JSON: how many rows a selective delete would remove. */
+    public function purgePreview(): void
+    {
+        try {
+            $counts = DataPurger::preview((array) ($_GET['datasets'] ?? []), (string) input('from', ''), (string) input('to', ''));
+        } catch (\InvalidArgumentException $e) {
+            $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        }
+        $this->json(['ok' => true, 'counts' => $counts]);
+    }
+
+    /** Selective, date-ranged permanent delete (Database Reset → by table & date). */
+    public function purge(): void
+    {
+        $me = DB::one('SELECT * FROM users WHERE id = ?', [Auth::id()]);
+        $datasets = (array) ($_POST['datasets'] ?? []);
+        $from = (string) input('from', '');
+        $to = (string) input('to', '');
+        if (trim((string) input('confirm', '')) !== 'DELETE') {
+            flash('error', 'Type DELETE in capital letters to confirm. Nothing was deleted.');
+            redirect('system/reset');
+        }
+        if (!Password::verify((string) ($_POST['password'] ?? ''), (string) $me['password'])) {
+            flash('error', 'Your password is incorrect. Nothing was deleted.');
+            redirect('system/reset');
+        }
+        try {
+            DataPurger::range($from, $to);
+            if (!array_intersect(array_keys(DataPurger::DATASETS), $datasets)) {
+                throw new \InvalidArgumentException('Choose at least one kind of data to delete.');
+            }
+            $backup = Backup::create('pre-reset');
+            $done = DataPurger::purge($datasets, $from, $to);
+        } catch (\InvalidArgumentException $e) {
+            flash('error', $e->getMessage());
+            redirect('system/reset');
+        }
+        $summary = [];
+        foreach ($done as $k => $n) {
+            $summary[] = DataPurger::DATASETS[$k][0] . ': ' . $n;
+        }
+        ActivityLog::record('Data deleted by date', 'system', null, fmt_date($from) . ' to ' . fmt_date($to) . ' — ' . implode(', ', $summary) . '. Safety backup: ' . $backup);
+        flash('success', 'Deleted ' . implode(', ', $summary) . ' (' . fmt_date($from) . ' to ' . fmt_date($to) . '). Safety backup: ' . $backup);
+        redirect('system/reset');
+    }
+
     // =========================================================== recycle bin
 
     /** Entities that support soft delete: key => [label, table, label SQL]. */
@@ -261,6 +308,42 @@ final class SystemController extends Controller
     }
 
     // ========================================================== activity log
+
+    /** JSON: number of log entries a clean would remove. */
+    public function logsPreview(): void
+    {
+        try {
+            $n = DataPurger::preview(['activity_logs'], (string) input('from', ''), (string) input('to', ''),
+                ['module' => input('module', ''), 'user_id' => (int) input('user_id', 0)])['activity_logs'];
+        } catch (\InvalidArgumentException $e) {
+            $this->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        }
+        $this->json(['ok' => true, 'count' => $n]);
+    }
+
+    /** Deletes activity-log entries in a date range (optionally one module / user). */
+    public function logsClean(): void
+    {
+        $from = (string) input('from', '');
+        $to = (string) input('to', '');
+        $filters = ['module' => input('module', ''), 'user_id' => (int) input('user_id', 0)];
+        try {
+            $count = DataPurger::preview(['activity_logs'], $from, $to, $filters)['activity_logs'];
+            if ($count === 0) {
+                flash('info', 'No log entries in that range — nothing to clean.');
+                redirect('system/logs');
+            }
+            $backup = Backup::create('pre-reset');
+            $done = DataPurger::purge(['activity_logs'], $from, $to, $filters)['activity_logs'];
+        } catch (\InvalidArgumentException $e) {
+            flash('error', $e->getMessage());
+            redirect('system/logs');
+        }
+        ActivityLog::record('Activity logs cleaned', 'system', null, $done . ' entries from ' . fmt_date($from) . ' to ' . fmt_date($to)
+            . ($filters['module'] ? ' (module ' . $filters['module'] . ')' : '') . '. Safety backup: ' . $backup);
+        flash('success', $done . ' log entries deleted (' . fmt_date($from) . ' to ' . fmt_date($to) . '). A safety backup was taken first.');
+        redirect('system/logs');
+    }
 
     public function logs(): void
     {

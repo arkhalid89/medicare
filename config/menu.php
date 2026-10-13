@@ -1,25 +1,97 @@
 <?php
 /**
- * Sidebar menu. Items are shown only when the user holds 'perm'.
- * 'match' lists route prefixes that keep the item highlighted.
+ * Sidebar menu. Items are shown only when the route exists and the user
+ * holds 'perm' ('a|b' = any of them). 'match' lists route prefixes that keep
+ * the item highlighted. The user's own workspaces (Doc 8 §4.2) are listed
+ * above this menu; an item already shown there is not repeated.
  */
 return [
     ['label' => 'Dashboard', 'icon' => 'home', 'route' => 'dashboard', 'perm' => 'dashboard.view'],
 
     ['section' => 'Clinical'],
     ['label' => 'New Visit', 'icon' => 'stethoscope', 'route' => 'visits/new', 'perm' => 'visits.create', 'highlight' => true],
+    ['label' => 'My OPD Queue', 'icon' => 'list', 'route' => 'consult', 'perm' => 'visits.create'],
     ['label' => 'Patients', 'icon' => 'users', 'route' => 'patients', 'perm' => 'patients.view', 'match' => ['patients']],
     ['label' => 'Visits', 'icon' => 'calendar', 'route' => 'visits', 'perm' => 'visits.view', 'match' => ['visits/view', 'visits/print']],
+    ['label' => 'Co-sign Queue', 'icon' => 'check', 'route' => 'clinical/cosign', 'perm' => 'clinical.cosign'],
     ['label' => 'Favourite Templates', 'icon' => 'star', 'route' => 'templates', 'perm' => 'templates.manage', 'match' => ['templates']],
+    ['label' => 'Specialty Exams', 'icon' => 'eye', 'route' => 'specialty', 'perm' => 'specialty.exam.record', 'match' => ['specialty/record']],
+    ['label' => 'Immunization', 'icon' => 'shield', 'route' => 'specialty/immunization', 'perm' => 'immunization.record'],
+    ['label' => 'Referrals', 'icon' => 'send', 'route' => 'clinical/referrals', 'perm' => 'clinical.referral.create'],
+
+    ['section' => 'Front Desk'],
+    ['label' => 'Registration Desk', 'icon' => 'user-plus', 'route' => 'frontdesk', 'perm' => 'frontdesk.register'],
+    ['label' => 'Token Console', 'icon' => 'list', 'route' => 'frontdesk/tokens', 'perm' => 'frontdesk.token.manage'],
+    ['label' => 'Appointments', 'icon' => 'calendar', 'route' => 'appointments', 'perm' => 'appointments.view', 'match' => ['appointments']],
+    ['label' => 'Vitals & Triage', 'icon' => 'activity', 'route' => 'frontdesk/vitals', 'perm' => 'vitals.record'],
+    ['label' => 'Display Boards', 'icon' => 'monitor', 'route' => 'frontdesk/boards', 'perm' => 'frontdesk.queue.configure'],
+
+    ['section' => 'Departments'],
+    ['label' => 'Dentistry', 'icon' => 'tooth', 'perm' => 'dental.chart.view|dental.labcase.view|dental.consumables', 'children' => [
+        ['label' => 'Dental Clinic', 'route' => 'dental', 'perm' => 'dental.chart.view'],
+        ['label' => 'Treatment Plans', 'route' => 'dental/plans', 'perm' => 'dental.chart.view'],
+        ['label' => 'Chairside', 'route' => 'dental/chairside', 'perm' => 'dental.consumables'],
+        ['label' => 'Lab Cases', 'route' => 'dental/lab-cases', 'perm' => 'dental.labcase.view'],
+    ]],
+    ['label' => 'Gynae / Obstetrics', 'icon' => 'heart', 'perm' => 'obgyn.history.view|obgyn.anc.record', 'children' => [
+        ['label' => 'Clinic', 'route' => 'obgyn', 'perm' => 'obgyn.history.view'],
+        ['label' => 'ANC / Labour Room', 'route' => 'obgyn/anc', 'perm' => 'obgyn.anc.record'],
+        ['label' => 'Pregnancies', 'route' => 'obgyn/pregnancies', 'perm' => 'obgyn.history.view'],
+    ]],
+    ['label' => 'Laboratory', 'icon' => 'flask', 'perm' => 'lab.view|lab.order.create', 'children' => [
+        ['label' => 'Reception', 'route' => 'lab/reception', 'perm' => 'lab.reception'],
+        ['label' => 'Sample Collection', 'route' => 'lab/collection', 'perm' => 'lab.sample.collect'],
+        ['label' => 'Bench / Results', 'route' => 'lab/bench', 'perm' => 'lab.result.enter'],
+        ['label' => 'Pathologist Desk', 'route' => 'lab/pathologist', 'perm' => 'lab.sample.review'],
+        ['label' => 'Quality Control', 'route' => 'lab/qc', 'perm' => 'lab.qc.record'],
+        ['label' => 'Lab Orders', 'route' => 'lab/orders', 'perm' => 'lab.view'],
+        ['label' => 'Test Catalog', 'route' => 'lab/catalog', 'perm' => 'lab.catalog.manage'],
+    ]],
+    ['label' => 'Radiology', 'icon' => 'image', 'perm' => 'radiology.view', 'children' => [
+        ['label' => 'Reception', 'route' => 'radiology/reception', 'perm' => 'radiology.schedule'],
+        ['label' => 'Imaging Worklist', 'route' => 'radiology/technician', 'perm' => 'radiology.acquire'],
+        ['label' => 'Radiologist Desk', 'route' => 'radiology/radiologist', 'perm' => 'radiology.review'],
+        ['label' => 'Imaging Orders', 'route' => 'radiology/orders', 'perm' => 'radiology.view'],
+        ['label' => 'Setup', 'route' => 'radiology/setup', 'perm' => 'radiology.manage'],
+    ]],
+    ['label' => 'Pharmacy', 'icon' => 'pill', 'perm' => 'pharmacy.view|pharmacy.counter_sale', 'children' => [
+        ['label' => 'Dispensing Queue', 'route' => 'pharmacy', 'perm' => 'pharmacy.dispense'],
+        ['label' => 'Counter Sale', 'route' => 'pharmacy/sale', 'perm' => 'pharmacy.counter_sale'],
+        ['label' => 'Returns', 'route' => 'pharmacy/returns', 'perm' => 'pharmacy.return'],
+        ['label' => 'Controlled Drugs', 'route' => 'pharmacy/controlled', 'perm' => 'pharmacy.controlled.register'],
+        ['label' => 'Chief Pharmacist', 'route' => 'pharmacy/chief', 'perm' => 'pharmacy.formulary.manage'],
+    ]],
+    ['label' => 'Store & Inventory', 'icon' => 'box', 'perm' => 'inventory.view', 'children' => [
+        ['label' => 'Store Dashboard', 'route' => 'inventory', 'perm' => 'inventory.view'],
+        ['label' => 'Stock on Hand', 'route' => 'inventory/stock', 'perm' => 'inventory.view'],
+        ['label' => 'Items', 'route' => 'inventory/items', 'perm' => 'inventory.view'],
+        ['label' => 'Indents / Requisitions', 'route' => 'inventory/indents', 'perm' => 'inventory.requisition.create|inventory.requisition.approve|inventory.issue'],
+        ['label' => 'Purchase Orders', 'route' => 'inventory/po', 'perm' => 'inventory.po.create|inventory.po.approve'],
+        ['label' => 'Goods Receipt (GRN)', 'route' => 'inventory/grn', 'perm' => 'inventory.grn.post'],
+        ['label' => 'Transfers', 'route' => 'inventory/transfers', 'perm' => 'inventory.transfer'],
+        ['label' => 'Adjustments', 'route' => 'inventory/adjustments', 'perm' => 'inventory.adjust.propose|inventory.adjust.approve'],
+        ['label' => 'Stocktake', 'route' => 'inventory/counts', 'perm' => 'inventory.count'],
+        ['label' => 'Expiry Watchlist', 'route' => 'inventory/expiry', 'perm' => 'inventory.view'],
+        ['label' => 'Assets', 'route' => 'inventory/assets', 'perm' => 'inventory.assets.manage'],
+    ]],
+
+    ['section' => 'Billing'],
+    ['label' => 'Billing Counter', 'icon' => 'receipt', 'route' => 'billing', 'perm' => 'billing.payment.collect'],
+    ['label' => 'Invoices', 'icon' => 'file-text', 'route' => 'billing/invoices', 'perm' => 'billing.view', 'match' => ['billing/invoice']],
+    ['label' => 'Billing Approvals', 'icon' => 'check', 'route' => 'billing/approvals', 'perm' => 'billing.refund.approve|billing.discount.approve|billing.void.approve'],
+    ['label' => 'Cash Sessions', 'icon' => 'money', 'route' => 'billing/sessions', 'perm' => 'billing.cash.close|billing.refund.approve'],
 
     ['section' => 'Reports'],
     ['label' => 'Reports', 'icon' => 'chart', 'perm' => 'reports.view', 'children' => [
         ['label' => 'Patient Visit Report', 'route' => 'reports/visits', 'perm' => 'reports.view'],
         ['label' => 'Fee Report', 'route' => 'reports/fees', 'perm' => 'reports.view'],
+        ['label' => 'Revenue by Department', 'route' => 'reports/revenue', 'perm' => 'reports.view'],
+        ['label' => 'Token & Waiting Times', 'route' => 'reports/tokens', 'perm' => 'reports.view'],
+        ['label' => 'Stock Valuation', 'route' => 'reports/stock', 'perm' => 'reports.view'],
     ]],
 
     ['section' => 'Configuration'],
-    ['label' => 'Master Data', 'icon' => 'layers', 'perm' => 'masters.view', 'children' => [
+    ['label' => 'Master Data', 'icon' => 'layers', 'perm' => 'masters.view|departments.manage|billing.services.manage|frontdesk.queue.configure', 'children' => [
         ['label' => 'Medicines', 'route' => 'masters/medicines', 'perm' => 'masters.view'],
         ['label' => 'Medicine Sources', 'route' => 'masters/medicine_sources', 'perm' => 'masters.view'],
         ['label' => 'Medicine–Source Mapping', 'route' => 'masters/mapping', 'perm' => 'masters.view'],
@@ -31,20 +103,32 @@ return [
         ['label' => 'Dosage Forms', 'route' => 'masters/dosage_forms', 'perm' => 'masters.view'],
         ['label' => 'Frequencies', 'route' => 'masters/frequencies', 'perm' => 'masters.view'],
         ['label' => 'Instructions', 'route' => 'masters/instructions', 'perm' => 'masters.view'],
+        ['label' => 'Branches', 'route' => 'masters/branches', 'perm' => 'branches.manage'],
         ['label' => 'Departments', 'route' => 'masters/departments', 'perm' => 'departments.manage'],
+        ['label' => 'Specialties', 'route' => 'masters/specialties', 'perm' => 'departments.manage'],
+        ['label' => 'Service Points', 'route' => 'masters/service_points', 'perm' => 'departments.manage'],
+        ['label' => 'Services & Prices', 'route' => 'billing/services', 'perm' => 'billing.services.manage'],
+        ['label' => 'Visit Types', 'route' => 'masters/visit_types', 'perm' => 'billing.services.manage'],
+        ['label' => 'Token Queues', 'route' => 'masters/token_queues', 'perm' => 'frontdesk.queue.configure'],
+        ['label' => 'Specialty Templates', 'route' => 'specialty/templates', 'perm' => 'clinical.parameters.configure'],
     ]],
-    ['label' => 'Settings', 'icon' => 'settings', 'perm' => 'print_designs.manage', 'children' => [
+    ['label' => 'Settings', 'icon' => 'settings', 'perm' => 'print_designs.manage|settings.manage', 'children' => [
         ['label' => 'Organization & System', 'route' => 'settings/general', 'perm' => 'settings.manage'],
         ['label' => 'Codes & Patterns', 'route' => 'settings/codes', 'perm' => 'settings.manage'],
         ['label' => 'Rx Split', 'route' => 'settings/rx', 'perm' => 'settings.manage'],
+        ['label' => 'Hospital & Billing', 'route' => 'settings/hospital', 'perm' => 'settings.manage'],
         ['label' => 'Prescription Designs', 'route' => 'settings/print', 'perm' => 'print_designs.manage'],
         ['label' => 'Theme', 'route' => 'settings/theme', 'perm' => 'settings.manage'],
     ]],
 
     ['section' => 'Administration'],
     ['label' => 'Users', 'icon' => 'user-cog', 'route' => 'users', 'perm' => 'users.view', 'match' => ['users']],
+    ['label' => 'Roles & Permissions', 'icon' => 'shield', 'route' => 'roles', 'perm' => 'roles.manage', 'match' => ['roles']],
+    ['label' => 'Emergency Access', 'icon' => 'alert', 'route' => 'emergency', 'perm' => 'emergency.review'],
+    ['label' => 'Audit Trail', 'icon' => 'list', 'route' => 'system/audit', 'perm' => 'audit.view'],
     ['label' => 'Backup & Restore', 'icon' => 'database', 'route' => 'system/backup', 'perm' => 'backup.create'],
     ['label' => 'Recycle Bin', 'icon' => 'trash', 'route' => 'system/recycle', 'perm' => 'records.delete'],
     ['label' => 'Activity Logs', 'icon' => 'list', 'route' => 'system/logs', 'perm' => 'activity.view'],
     ['label' => 'Database Reset', 'icon' => 'alert', 'route' => 'system/reset', 'perm' => 'db.reset'],
+    ['label' => 'Subscription', 'icon' => 'key', 'route' => 'license', 'perm' => 'settings.manage'],
 ];

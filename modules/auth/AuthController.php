@@ -18,7 +18,7 @@ final class AuthController extends Controller
     public function login(): void
     {
         if (Auth::check()) {
-            redirect('dashboard');
+            redirect(Auth::homeRoute());
         }
         $error = null;
         if (is_post()) {
@@ -28,6 +28,9 @@ final class AuthController extends Controller
                 $error = 'Please enter your username and password.';
             } else {
                 $result = Auth::attempt($username, $password);
+                if (!empty($result['two_factor'])) {
+                    redirect('login/2fa');
+                }
                 if ($result['ok']) {
                     $auto = Backup::runScheduled();
                     flash('success', $result['message'] . ($auto ? ' An automatic backup was created.' : ''));
@@ -36,18 +39,26 @@ final class AuthController extends Controller
                     if ($intended !== '' && str_starts_with($intended, (string) (parse_url(base_url(), PHP_URL_PATH) ?: '/'))) {
                         redirect_to($intended);
                     }
-                    redirect('dashboard');
+                    redirect(Auth::homeRoute());
                 }
                 $error = $result['message'];
             }
         }
 
+        // Debug mode lists the sample logins of a demo install (passwords are
+        // hashed in the database, so they come from the seed list).
         $sampleUsers = [];
         if (config('app.debug')) {
-            $sampleUsers = DB::all(
-                "SELECT username, password, role FROM users WHERE deleted_at IS NULL AND is_active = 1
-                  AND username IN ('superadmin','deptadmin','doctor','doctor2','reporting') ORDER BY FIELD(role,'super_admin','dept_admin','doctor','reporting'), username"
-            );
+            $known = [['superadmin', 'admin123', 'SA']];
+            foreach (\App\Core\Seeder::SAMPLE_USERS as $u) {
+                $known[] = [$u[1], $u[2], $u[3]];
+            }
+            foreach ($known as [$un, $pw, $code]) {
+                $row = DB::one('SELECT password FROM users WHERE username = ? AND deleted_at IS NULL AND is_active = 1', [$un]);
+                if ($row && \App\Core\Password::verify($pw, (string) $row['password'])) {
+                    $sampleUsers[] = ['username' => $un, 'password' => $pw, 'role' => $code];
+                }
+            }
         }
         $this->view('auth/login', ['title' => 'Sign in', 'error' => $error, 'sampleUsers' => $sampleUsers], 'auth');
     }
@@ -128,5 +139,69 @@ final class AuthController extends Controller
             }
         }
         $this->view('auth/password', ['title' => 'Change Password', 'errors' => array_values($errors)]);
+    }
+
+    /** Second login step: the authenticator code. */
+    public function twoFactor(): void
+    {
+        if (!Auth::pendingTwoFactor()) {
+            redirect('login');
+        }
+        $error = null;
+        if (is_post()) {
+            $result = Auth::verifyTwoFactor((string) input('code', ''));
+            if ($result['ok']) {
+                flash('success', $result['message']);
+                redirect(Auth::homeRoute());
+            }
+            if (!empty($result['restart'])) {
+                flash('warning', $result['message']);
+                redirect('login');
+            }
+            $error = $result['message'];
+        }
+        $this->view('auth/two_factor', ['title' => 'Two-factor sign in', 'error' => $error], 'auth');
+    }
+
+    /** Set up / turn off the authenticator for the own account. */
+    public function setupTwoFactor(): void
+    {
+        $user = Auth::user();
+        $row = DB::one('SELECT two_factor_secret, two_factor_enabled FROM users WHERE id = ?', [$user['id']]);
+        $secret = (string) Session::get('2fa_new_secret', '');
+        if ($secret === '') {
+            $secret = \App\Core\Totp::secret();
+            Session::set('2fa_new_secret', $secret);
+        }
+        $error = null;
+        if (is_post()) {
+            if (input('disable')) {
+                $stored = (string) DB::value('SELECT password FROM users WHERE id = ?', [$user['id']]);
+                if (!Password::verify((string) ($_POST['password'] ?? ''), $stored)) {
+                    $error = 'Password is incorrect.';
+                } else {
+                    DB::update('users', ['two_factor_enabled' => 0, 'two_factor_secret' => null], 'id = ?', [$user['id']]);
+                    ActivityLog::record('2FA disabled', 'auth', (string) $user['id'], 'Two-factor login turned off');
+                    flash('success', 'Two-factor login is off.');
+                    redirect('profile/2fa');
+                }
+            } elseif (\App\Core\Totp::verify($secret, (string) input('code', ''))) {
+                DB::update('users', ['two_factor_enabled' => 1, 'two_factor_secret' => $secret], 'id = ?', [$user['id']]);
+                Session::forget('2fa_new_secret');
+                ActivityLog::record('2FA enabled', 'auth', (string) $user['id'], 'Two-factor login turned on');
+                flash('success', 'Two-factor login is on. You will be asked for a code at every sign in.');
+                redirect(Auth::homeRoute());
+            } else {
+                $error = 'The code does not match. Check the time on your phone and try again.';
+            }
+        }
+        $this->view('auth/two_factor_setup', [
+            'title'   => 'Two-factor Login',
+            'enabled' => (int) $row['two_factor_enabled'] === 1,
+            'secret'  => $secret,
+            'uri'     => \App\Core\Totp::uri($secret, $user['username'], (string) setting('org_name', 'MediCare')),
+            'error'   => $error,
+            'forced'  => Auth::mustSetupTwoFactor(),
+        ]);
     }
 }

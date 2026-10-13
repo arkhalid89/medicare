@@ -6,7 +6,8 @@
 
   Steps
     1. Download (once, cached in installer\cache) and verify SHA-256:
-         PHP 8.2 NTS x64, MariaDB 10.11 x64, Microsoft VC++ 2015-2022 runtime
+         PHP 8.2 NTS x64, MariaDB 10.11 x64, nginx 1.26 (LAN server mode),
+         Microsoft VC++ 2015-2022 runtime
     2. Stage runtime\php, runtime\mariadb (trimmed) and app\ (the PHP project)
     3. Compile the launcher MediCare.exe with the C# compiler built into Windows
     4. Compile installer\medicare.iss with Inno Setup 6 -> installer\output\
@@ -28,7 +29,11 @@ $downloads = @(
     @{ Name = 'mariadb-10.11.19-winx64.zip'; Url = 'https://archive.mariadb.org/mariadb-10.11.19/winx64-packages/mariadb-10.11.19-winx64.zip';
        Alt = 'https://downloads.mariadb.org/rest-api/mariadb/10.11.19/mariadb-10.11.19-winx64.zip';
        Sha = '398ea30e5036010bbebe01d2b1804280424dcc2626e36d8e95155c04d25a0490' },
-    @{ Name = 'vc_redist.x64.exe'; Url = 'https://aka.ms/vs/17/release/vc_redist.x64.exe'; Alt = $null; Sha = $null }
+    @{ Name = 'vc_redist.x64.exe'; Url = 'https://aka.ms/vs/17/release/vc_redist.x64.exe'; Alt = $null; Sha = $null },
+    # nginx serves the application to the hospital LAN (with a pool of php-cgi workers).
+    # nginx.org signs releases with PGP only: the SHA-256 of the first download is
+    # pinned in cache\pins.txt and every later build must match it (set Sha here to pin it in code).
+    @{ Name = 'nginx-1.26.2.zip'; Url = 'https://nginx.org/download/nginx-1.26.2.zip'; Alt = $null; Sha = $null; Pin = $true }
 )
 
 function Step($text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
@@ -46,7 +51,18 @@ foreach ($d in $downloads) {
             Invoke-WebRequest -Uri $d.Alt -OutFile $file -UseBasicParsing
         }
     }
-    if ($d.Sha) {
+    if ($d.Pin -and -not $d.Sha) {
+        $pins = Join-Path $cache 'pins.txt'
+        $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+        $known = if (Test-Path $pins) { (Get-Content $pins | Where-Object { $_ -like "$($d.Name) *" }) } else { $null }
+        if ($known) {
+            if ($known.Split(' ')[1] -ne $hash) { Remove-Item $file; throw "Checksum of $($d.Name) differs from the pinned value - file removed." }
+            Write-Host "  $($d.Name) verified (pinned sha256)"
+        } else {
+            Add-Content $pins "$($d.Name) $hash"
+            Write-Host "  $($d.Name) pinned (sha256 $hash) - verify against nginx.org before shipping" -ForegroundColor Yellow
+        }
+    } elseif ($d.Sha) {
         $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
         if ($hash -ne $d.Sha) { Remove-Item $file; throw "Checksum mismatch for $($d.Name) - file removed, run again." }
         Write-Host "  $($d.Name) verified (sha256)"
@@ -66,7 +82,7 @@ New-Item -ItemType Directory -Force "$stage\runtime", "$stage\app", "$stage\redi
 Expand-Archive (Join-Path $cache $downloads[0].Name) "$stage\runtime\php"
 Copy-Item (Join-Path $dir 'php.ini') "$stage\runtime\php\php.ini"
 # Keep only what the application needs from PHP.
-Get-ChildItem "$stage\runtime\php\ext" -Filter *.dll | Where-Object { $_.Name -notin @('php_pdo_mysql.dll', 'php_mbstring.dll', 'php_opcache.dll', 'php_curl.dll', 'php_fileinfo.dll') } | Remove-Item
+Get-ChildItem "$stage\runtime\php\ext" -Filter *.dll | Where-Object { $_.Name -notin @('php_pdo_mysql.dll', 'php_mbstring.dll', 'php_opcache.dll', 'php_curl.dll', 'php_fileinfo.dll', 'php_sodium.dll') } | Remove-Item
 Remove-Item "$stage\runtime\php\dev", "$stage\runtime\php\extras" -Recurse -Force -ErrorAction SilentlyContinue
 
 Expand-Archive (Join-Path $cache $downloads[1].Name) "$stage\runtime\mdb-tmp"
@@ -83,8 +99,16 @@ Get-ChildItem "$stage\runtime\mariadb\bin" -Filter *.exe | Where-Object { $_.Nam
 
 Copy-Item (Join-Path $cache 'vc_redist.x64.exe') "$stage\redist\"
 
+# nginx for the LAN server mode (configuration is written by the launcher at start).
+Expand-Archive (Join-Path $cache 'nginx-1.26.2.zip') "$stage\runtime\ngx-tmp"
+$ngx = Get-ChildItem "$stage\runtime\ngx-tmp" -Directory | Select-Object -First 1
+Move-Item $ngx.FullName "$stage\runtime\nginx"
+Remove-Item "$stage\runtime\ngx-tmp" -Recurse -Force
+Remove-Item "$stage\runtime\nginx\html", "$stage\runtime\nginx\docs", "$stage\runtime\nginx\contrib" -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force "$stage\runtime\nginx\logs", "$stage\runtime\nginx\temp" | Out-Null
+
 # Application files (no dev/test/runtime data).
-$exclude = @('installer', 'docker', 'docker-compose.yml', '.git', '.gitignore', '.claude')
+$exclude = @('installer', 'docker', 'docker-compose.yml', '.git', '.gitignore', '.claude', 'tools')
 Get-ChildItem $root -Force | Where-Object { $_.Name -notin $exclude } | ForEach-Object {
     Copy-Item $_.FullName "$stage\app\" -Recurse -Force
 }

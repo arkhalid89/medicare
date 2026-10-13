@@ -11,4 +11,6 @@ return [
     'visits/delete'    => ['POST', [VisitController::class, 'delete'], 'records.delete'],
     'visits/medicines' => ['GET', [VisitController::class, 'medicines'], 'visits.create'],
     'visits/lookup'    => ['GET', [VisitController::class, 'lookup'], 'visits.create'],
+    'visits/history'   => ['GET', [VisitController::class, 'history'], 'visits.create'],
+    'visits/refill'    => ['GET', [VisitController::class, 'refill'], 'visits.create'],
 ];

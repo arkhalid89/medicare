@@ -7,6 +7,7 @@ declare(strict_types=1);
 require dirname(__DIR__) . '/core/bootstrap.php';
 
 use App\Core\Installer;
+use App\Core\Migrator;
 use App\Core\Router;
 use App\Core\Session;
 
@@ -20,4 +21,6 @@ header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: same-origin');
 
 Session::start();
+Migrator::runIfNeeded();
+App\Core\DailyJobs::runIfDue();
 Router::dispatch();

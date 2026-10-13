@@ -1,9 +1,15 @@
 // ============================================================================
 //  MediCare Practice — desktop launcher (MediCare.exe)
 //
-//  Starts the bundled MariaDB and PHP servers (localhost only), creates the
+//  Starts the bundled MariaDB and the application server, creates the
 //  database on first run, opens the application in the default browser and
-//  stays in the system tray. Exiting from the tray stops both servers.
+//  stays in the system tray. Exiting from the tray stops all servers.
+//
+//  Two modes (data\launcher.ini → server_mode):
+//    local : this PC only — PHP's built-in server on 127.0.0.1 (v1 behaviour)
+//    lan   : hospital server — nginx on all network cards + a pool of php-cgi
+//            workers, so department PCs (front desk, lab, pharmacy …) open the
+//            application in their browser. MariaDB always stays on 127.0.0.1.
 //
 //    MediCare.exe          start (or, if already running, just open the app)
 //    MediCare.exe --tray   start without opening the browser (Windows startup)
@@ -17,6 +23,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -61,6 +68,7 @@ namespace MediCare
     internal sealed class Paths
     {
         public readonly string Base, App, Public, Php, PhpIni, MariaBin, Data, DataDir, Sessions, Temp, Logs, Backups, Lock, MyIni;
+        public readonly string PhpCgi, NginxDir, NginxExe, NginxData, NginxConf;
 
         public Paths(string baseDir)
         {
@@ -78,7 +86,15 @@ namespace MediCare
             Backups = Path.Combine(App, @"storage\backups");
             Lock = Path.Combine(App, @"storage\installed.lock");
             MyIni = Path.Combine(Data, "my.ini");
+            PhpCgi = Path.Combine(Base, @"runtime\php\php-cgi.exe");
+            NginxDir = Path.Combine(Base, @"runtime\nginx");
+            NginxExe = Path.Combine(NginxDir, "nginx.exe");
+            NginxData = Path.Combine(Data, "nginx");
+            NginxConf = Path.Combine(NginxData, "nginx.conf");
         }
+
+        /// <summary>True when the LAN web server (nginx + php-cgi) is bundled.</summary>
+        public bool HasNginx { get { return File.Exists(NginxExe) && File.Exists(PhpCgi); } }
 
         public string MariaExe(string preferred, string fallback)
         {
@@ -93,7 +109,11 @@ namespace MediCare
         public int WebPort = 8765;
         public int DbPort = 33106;
         public bool Demo;
+        public string Mode = "local";
+        public int Workers = 8;
         private string file;
+
+        public bool Lan { get { return Mode == "lan"; } }
 
         public static Config Load(Paths p)
         {
@@ -112,6 +132,8 @@ namespace MediCare
                     if (key == "web_port" && int.TryParse(val, out n)) c.WebPort = n;
                     if (key == "db_port" && int.TryParse(val, out n)) c.DbPort = n;
                     if (key == "demo") c.Demo = val == "1";
+                    if (key == "server_mode") c.Mode = val.ToLowerInvariant() == "lan" ? "lan" : "local";
+                    if (key == "web_workers" && int.TryParse(val, out n) && n >= 2 && n <= 64) c.Workers = n;
                 }
             }
             return c;
@@ -121,8 +143,11 @@ namespace MediCare
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file));
             File.WriteAllText(file,
-                "[launcher]\r\n; Ports used by MediCare Practice on this computer (localhost only).\r\n" +
-                "web_port=" + WebPort + "\r\ndb_port=" + DbPort + "\r\ndemo=" + (Demo ? "1" : "0") + "\r\n");
+                "[launcher]\r\n; Ports used by MediCare Practice on this computer.\r\n" +
+                "; server_mode=local  -> only this PC (127.0.0.1)\r\n" +
+                "; server_mode=lan    -> hospital server: other PCs open http://<this-PC-IP>:" + WebPort + "/\r\n" +
+                "web_port=" + WebPort + "\r\ndb_port=" + DbPort + "\r\ndemo=" + (Demo ? "1" : "0") + "\r\n" +
+                "server_mode=" + Mode + "\r\nweb_workers=" + Workers + "\r\n");
         }
     }
 
@@ -168,6 +193,38 @@ namespace MediCare
             try { Process.Start("http://127.0.0.1:" + port + "/"); } catch { }
         }
 
+        /// <summary>IPv4 addresses of this PC on the hospital network.</summary>
+        public static List<string> LanAddresses()
+        {
+            List<string> list = new List<string>();
+            try
+            {
+                foreach (IPAddress ip in Dns.GetHostAddresses(Dns.GetHostName()))
+                {
+                    if (ip.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(ip) && !ip.ToString().StartsWith("169.254."))
+                        list.Add(ip.ToString());
+                }
+            }
+            catch { }
+            return list;
+        }
+
+        /// <summary>Opens the web port in Windows Firewall (asks for administrator rights).</summary>
+        public static void AllowFirewall(int port)
+        {
+            try
+            {
+                ProcessStartInfo si = new ProcessStartInfo("cmd.exe",
+                    "/c netsh advfirewall firewall delete rule name=\"MediCare Practice (LAN)\" & netsh advfirewall firewall add rule name=\"MediCare Practice (LAN)\" dir=in action=allow protocol=TCP localport=" + port + " profile=private,domain");
+                si.Verb = "runas";
+                si.UseShellExecute = true;
+                si.WindowStyle = ProcessWindowStyle.Hidden;
+                Process pr = Process.Start(si);
+                if (pr != null) pr.WaitForExit(30000);
+            }
+            catch { }
+        }
+
         /// <summary>Runs a helper program hidden and waits for it.</summary>
         public static int RunHidden(string exe, string arguments, string workDir, Dictionary<string, string> env, string logFile, int timeoutMs)
         {
@@ -197,11 +254,31 @@ namespace MediCare
         }
 
         /// <summary>Stops MariaDB gracefully, then any leftover process started from this installation.</summary>
+        /// <summary>True when a database server started from THIS installation is running.</summary>
+        private static bool OwnDatabaseRunning(Paths p)
+        {
+            string bin = p.MariaBin.ToLowerInvariant();
+            foreach (string name in new[] { "mariadbd", "mysqld" })
+            {
+                foreach (Process pr in Process.GetProcessesByName(name))
+                {
+                    try
+                    {
+                        if (pr.MainModule.FileName.ToLowerInvariant().StartsWith(bin)) return true;
+                    }
+                    catch { }
+                }
+            }
+            return false;
+        }
+
         public static void StopAll(Paths p, bool includeLaunchers)
         {
             Config cfg = Config.Load(p);
             string admin = p.MariaExe("mariadb-admin.exe", "mysqladmin.exe");
-            if (File.Exists(admin) && PortOpen(cfg.DbPort))
+            // Never send "shutdown" to a port unless our own server is the one running:
+            // another MediCare copy (or any MySQL) may be listening there.
+            if (File.Exists(admin) && PortOpen(cfg.DbPort) && OwnDatabaseRunning(p))
             {
                 try { RunHidden(admin, "--host=127.0.0.1 --port=" + cfg.DbPort + " --user=root shutdown", p.MariaBin, null, null, 20000); }
                 catch (Exception ex) { Log(p, "shutdown failed: " + ex.Message); }
@@ -293,7 +370,9 @@ namespace MediCare
         private readonly Splash splash;
         private readonly Icon icon;
         private Config cfg;
-        private Process mysqld, php;
+        private Process mysqld, php, nginx;
+        private readonly List<Process> cgis = new List<Process>();
+        private ToolStripMenuItem lanItem, modeItem;
         private System.Windows.Forms.Timer watchdog;
         private volatile bool stopping;
 
@@ -307,6 +386,11 @@ namespace MediCare
             ToolStripMenuItem openItem = new ToolStripMenuItem("Open MediCare Practice", null, delegate { Services.OpenBrowser(cfg.WebPort); });
             openItem.Font = new Font(openItem.Font, FontStyle.Bold);
             menu.Items.Add(openItem);
+            lanItem = new ToolStripMenuItem("Network address: (starting)", null, delegate { CopyLanAddress(); });
+            lanItem.Visible = false;
+            menu.Items.Add(lanItem);
+            modeItem = new ToolStripMenuItem("Server mode…", null, delegate { ToggleMode(); });
+            menu.Items.Add(modeItem);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Open backups folder", null, delegate { OpenFolder(p.Backups); });
             menu.Items.Add("Open logs folder", null, delegate { OpenFolder(p.Logs); });
@@ -366,7 +450,12 @@ namespace MediCare
                 }
 
                 if (Services.PortOpen(cfg.DbPort)) cfg.DbPort = Services.FreePort(cfg.DbPort + 1);
-                if (Services.PortOpen(cfg.WebPort)) cfg.WebPort = Services.FreePort(cfg.WebPort + 1);
+                if (Services.PortOpen(cfg.WebPort))
+                {
+                    // Department PCs bookmark the server address: in LAN mode the port never moves.
+                    if (cfg.Lan) throw new Exception("Port " + cfg.WebPort + " is used by another program. Close it, or change web_port in data\\launcher.ini (and the bookmarks on the other PCs).");
+                    cfg.WebPort = Services.FreePort(cfg.WebPort + 1);
+                }
                 cfg.Save();
 
                 splash.SetStatus("Starting the database server…");
@@ -389,8 +478,8 @@ namespace MediCare
                 // -------- Web server ----------------------------------------
                 splash.SetStatus("Starting the application server…");
                 StartPhp();
-                WaitForPort(cfg.WebPort, 30, "The application server did not start.", php);
-                Services.Log(p, "Ready on http://127.0.0.1:" + cfg.WebPort + " (database port " + cfg.DbPort + ")");
+                WaitForPort(cfg.WebPort, 30, "The application server did not start (see logs\\nginx-error.log / php-error.log).", UsesNginx() ? nginx : php);
+                Services.Log(p, "Ready on http://127.0.0.1:" + cfg.WebPort + " (database port " + cfg.DbPort + ", mode " + cfg.Mode + (cfg.Lan ? ", LAN " + string.Join(", ", Services.LanAddresses().ToArray()) : "") + ")");
 
                 splash.BeginInvoke(new Action(Ready));
             }
@@ -411,9 +500,17 @@ namespace MediCare
         private void Ready()
         {
             splash.Hide();
-            tray.Text = "MediCare Practice — running (port " + cfg.WebPort + ")";
+            string addr = LanAddress();
+            tray.Text = cfg.Lan ? ("MediCare — server " + addr).Substring(0, Math.Min(63, ("MediCare — server " + addr).Length)) : "MediCare Practice — running (port " + cfg.WebPort + ")";
+            modeItem.Text = cfg.Lan ? "Switch to this-PC-only mode…" : "Make this PC the hospital server (LAN)…";
+            if (cfg.Lan)
+            {
+                lanItem.Text = "Network address: " + addr + "  (click to copy)";
+                lanItem.Visible = true;
+            }
             if (openBrowser) Services.OpenBrowser(cfg.WebPort);
-            tray.ShowBalloonTip(4000, "MediCare Practice is running", "Double-click this icon to open the application. Right-click to stop the server.", ToolTipIcon.Info);
+            tray.ShowBalloonTip(5000, "MediCare Practice is running",
+                cfg.Lan ? "Other PCs on the network open " + addr + " in their browser." : "Double-click this icon to open the application. Right-click to stop the server.", ToolTipIcon.Info);
 
             watchdog = new System.Windows.Forms.Timer();
             watchdog.Interval = 10000;
@@ -432,7 +529,19 @@ namespace MediCare
                     Services.Log(p, "Database server stopped unexpectedly - restarting");
                     StartMysqld();
                 }
-                if (php == null || php.HasExited)
+                if (UsesNginx())
+                {
+                    if (nginx == null || nginx.HasExited)
+                    {
+                        Services.Log(p, "Web server stopped unexpectedly - restarting");
+                        StartNginx();
+                    }
+                    for (int i = 0; i < cgis.Count; i++)
+                    {
+                        if (cgis[i] == null || cgis[i].HasExited) cgis[i] = StartCgi(9100 + i);
+                    }
+                }
+                else if (php == null || php.HasExited)
                 {
                     Services.Log(p, "Application server stopped unexpectedly - restarting");
                     StartPhp();
@@ -487,14 +596,124 @@ namespace MediCare
             return env;
         }
 
+        private bool UsesNginx() { return cfg.Lan && p.HasNginx; }
+
         private void StartPhp()
         {
-            ProcessStartInfo si = new ProcessStartInfo(p.Php, PhpArgs() + " -S 127.0.0.1:" + cfg.WebPort + " -t \"" + p.Public + "\"");
+            if (UsesNginx())
+            {
+                cgis.Clear();
+                for (int i = 0; i < cfg.Workers; i++) cgis.Add(StartCgi(9100 + i));
+                WriteNginxConf();
+                StartNginx();
+                php = null;
+                return;
+            }
+            // LAN without the bundled nginx: PHP's own server on all interfaces (one request at a time).
+            string bind = cfg.Lan ? "0.0.0.0" : "127.0.0.1";
+            ProcessStartInfo si = new ProcessStartInfo(p.Php, PhpArgs() + " -S " + bind + ":" + cfg.WebPort + " -t \"" + p.Public + "\"");
             si.UseShellExecute = false;
             si.CreateNoWindow = true;
             si.WorkingDirectory = p.App;
             foreach (KeyValuePair<string, string> kv in AppEnv()) si.EnvironmentVariables[kv.Key] = kv.Value;
             php = Process.Start(si);
+        }
+
+        /// <summary>One FastCGI worker (restarted by the watchdog; recycles itself after 1000 requests).</summary>
+        private Process StartCgi(int port)
+        {
+            ProcessStartInfo si = new ProcessStartInfo(p.PhpCgi, PhpArgs() + " -b 127.0.0.1:" + port);
+            si.UseShellExecute = false;
+            si.CreateNoWindow = true;
+            si.WorkingDirectory = p.App;
+            foreach (KeyValuePair<string, string> kv in AppEnv()) si.EnvironmentVariables[kv.Key] = kv.Value;
+            si.EnvironmentVariables["PHP_FCGI_MAX_REQUESTS"] = "1000";
+            si.EnvironmentVariables["PHP_FCGI_CHILDREN"] = "0";
+            return Process.Start(si);
+        }
+
+        private void WriteNginxConf()
+        {
+            Directory.CreateDirectory(p.NginxData);
+            foreach (string d in new[] { "client_temp", "fastcgi_temp", "proxy_temp", "uwsgi_temp", "scgi_temp", "logs" })
+                Directory.CreateDirectory(Path.Combine(p.NginxData, d));
+            Func<string, string> f = delegate(string x) { return x.Replace('\\', '/'); };
+            StringBuilder up = new StringBuilder();
+            for (int i = 0; i < cfg.Workers; i++) up.Append("        server 127.0.0.1:" + (9100 + i) + " max_fails=0;\r\n");
+            string conf =
+                "worker_processes 2;\r\n" +
+                "error_log \"" + f(Path.Combine(p.Logs, "nginx-error.log")) + "\" warn;\r\n" +
+                "pid \"" + f(Path.Combine(p.NginxData, "nginx.pid")) + "\";\r\n" +
+                "events { worker_connections 1024; }\r\n" +
+                "http {\r\n" +
+                "    include \"" + f(Path.Combine(p.NginxDir, @"conf\mime.types")) + "\";\r\n" +
+                "    default_type application/octet-stream;\r\n" +
+                "    sendfile on;\r\n    keepalive_timeout 65;\r\n    server_tokens off;\r\n    client_max_body_size 512m;\r\n" +
+                "    access_log off;\r\n" +
+                "    client_body_temp_path \"" + f(Path.Combine(p.NginxData, "client_temp")) + "\";\r\n" +
+                "    fastcgi_temp_path \"" + f(Path.Combine(p.NginxData, "fastcgi_temp")) + "\";\r\n" +
+                "    proxy_temp_path \"" + f(Path.Combine(p.NginxData, "proxy_temp")) + "\";\r\n" +
+                "    uwsgi_temp_path \"" + f(Path.Combine(p.NginxData, "uwsgi_temp")) + "\";\r\n" +
+                "    scgi_temp_path \"" + f(Path.Combine(p.NginxData, "scgi_temp")) + "\";\r\n" +
+                "    upstream medicare_php {\r\n" + up + "    }\r\n" +
+                "    server {\r\n" +
+                "        listen " + cfg.WebPort + ";\r\n" +
+                "        root \"" + f(p.Public) + "\";\r\n" +
+                "        index index.php;\r\n" +
+                "        add_header X-Content-Type-Options nosniff always;\r\n" +
+                "        location ~ /\\. { deny all; }\r\n" +
+                "        location ^~ /uploads/ { location ~ \\.php$ { deny all; } }\r\n" +
+                "        location / { try_files $uri $uri/ /index.php?$query_string; }\r\n" +
+                "        location ~ \\.php$ {\r\n" +
+                "            try_files $uri =404;\r\n" +
+                "            fastcgi_pass medicare_php;\r\n" +
+                "            fastcgi_next_upstream error timeout;\r\n" +
+                "            fastcgi_read_timeout 600;\r\n" +
+                "            include \"" + f(Path.Combine(p.NginxDir, @"conf\fastcgi_params")) + "\";\r\n" +
+                "            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;\r\n" +
+                "        }\r\n" +
+                "    }\r\n" +
+                "}\r\n";
+            File.WriteAllText(p.NginxConf, conf);
+        }
+
+        private void StartNginx()
+        {
+            // Forward slashes: a trailing backslash before a quote would escape it on the command line.
+            ProcessStartInfo si = new ProcessStartInfo(p.NginxExe, "-p \"" + p.NginxData.Replace('\\', '/') + "/\" -c \"" + p.NginxConf.Replace('\\', '/') + "\"");
+            si.UseShellExecute = false;
+            si.CreateNoWindow = true;
+            si.WorkingDirectory = p.NginxDir;
+            nginx = Process.Start(si);
+        }
+
+        private string LanAddress()
+        {
+            List<string> ips = Services.LanAddresses();
+            return "http://" + (ips.Count > 0 ? ips[0] : Environment.MachineName) + ":" + cfg.WebPort + "/";
+        }
+
+        private void CopyLanAddress()
+        {
+            try { Clipboard.SetText(LanAddress()); tray.ShowBalloonTip(2500, "Address copied", LanAddress(), ToolTipIcon.Info); } catch { }
+        }
+
+        /// <summary>Switches between this-PC-only and hospital-server mode (restart needed).</summary>
+        private void ToggleMode()
+        {
+            bool toLan = !cfg.Lan;
+            string text = toLan
+                ? "Make this PC the hospital server?\n\nOther computers on the network will open MediCare at\n" + LanAddress() +
+                  "\n\nWindows will ask for administrator permission to open port " + cfg.WebPort + " in the firewall. Every user signs in with their own account.\nMediCare restarts now."
+                : "Switch back to this-PC-only mode?\n\nOther computers will no longer reach MediCare. MediCare restarts now.";
+            if (MessageBox.Show(text, "MediCare Practice", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            cfg.Mode = toLan ? "lan" : "local";
+            cfg.Save();
+            if (toLan) Services.AllowFirewall(cfg.WebPort);
+            StopServices();
+            tray.Visible = false;
+            try { Process.Start(Application.ExecutablePath); } catch { }
+            ExitThread();
         }
 
         private static void WaitForPort(int port, int seconds, string error, Process owner)
@@ -525,6 +744,8 @@ namespace MediCare
             stopping = true;
             if (watchdog != null) watchdog.Stop();
             try { if (php != null && !php.HasExited) php.Kill(); } catch { }
+            try { if (nginx != null && !nginx.HasExited) nginx.Kill(); } catch { }
+            foreach (Process c in cgis) { try { if (c != null && !c.HasExited) c.Kill(); } catch { } }
             Services.StopAll(p, false);
             Services.Log(p, "Stopped");
         }

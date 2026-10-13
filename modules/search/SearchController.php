@@ -30,7 +30,7 @@ final class SearchController extends Controller
             $items[] = ['type' => 'Visit', 'title' => $v['visit_no'] . ' — ' . $v['name'], 'subtitle' => fmt_datetime($v['visit_date']) . ' · ' . $v['doctor_name'], 'url' => url('visits/view', ['id' => $v['id']])];
         }
         foreach ($patients as $p) {
-            $items[] = ['type' => 'Patient', 'title' => $p['name'], 'subtitle' => implode(' · ', array_filter([$p['mrn'], $p['gender'] . ' ' . $p['age'], $p['cnic'], $p['phone']])), 'url' => url('patients/view', ['id' => $p['id']])];
+            $items[] = ['type' => 'Patient', 'title' => $p['name'], 'subtitle' => implode(' · ', array_filter([$p['mrn'], $p['gender'] . ' ' . $p['age'], cnic_mask($p['cnic']), $p['phone']])), 'url' => url('patients/view', ['id' => $p['id']])];
         }
         $this->json(['ok' => true, 'items' => $items]);
     }

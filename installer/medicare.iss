@@ -4,7 +4,7 @@
 ; ============================================================================
 
 #define AppName      "MediCare Practice"
-#define AppVersion   "1.0.0"
+#define AppVersion   "2.0.0"
 #define AppPublisher "MediCare Practice"
 #define AppExe       "MediCare.exe"
 
@@ -46,6 +46,7 @@ WelcomeLabel2=This will install [name/ver] on your computer.%n%nMediCare Practic
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Shortcuts:"
 Name: "autostart"; Description: "Start MediCare Practice automatically when Windows starts"; GroupDescription: "Options:"; Flags: unchecked
 Name: "demo"; Description: "Load demo patients and visits (for evaluation only, not for a live clinic)"; GroupDescription: "Options:"; Flags: unchecked
+Name: "lanserver"; Description: "Hospital server: department PCs on the network open MediCare in their browser (opens port 8765 in Windows Firewall)"; GroupDescription: "Server mode:"; Flags: unchecked
 
 [Dirs]
 Name: "{app}"; Permissions: users-modify
@@ -58,6 +59,7 @@ Source: "build\redist\vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterin
 
 [INI]
 Filename: "{app}\data\launcher.ini"; Section: "launcher"; Key: "demo"; String: "1"; Tasks: demo
+Filename: "{app}\data\launcher.ini"; Section: "launcher"; Key: "server_mode"; String: "lan"; Tasks: lanserver
 
 [Icons]
 Name: "{autoprograms}\{#AppName}\{#AppName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"
@@ -68,16 +70,20 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app
 Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExe}"; Parameters: "--tray"; WorkingDir: "{app}"; Tasks: autostart
 
 [Run]
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""MediCare Practice (LAN)"""; Flags: runhidden; Tasks: lanserver
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""MediCare Practice (LAN)"" dir=in action=allow protocol=TCP localport=8765 profile=private,domain"; StatusMsg: "Opening the MediCare port in Windows Firewall..."; Flags: runhidden; Tasks: lanserver
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Microsoft Visual C++ runtime..."; Check: VCRedistNeeded; Flags: waituntilterminated
 Filename: "{app}\{#AppExe}"; Description: "Start {#AppName} now"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 [UninstallRun]
 Filename: "{app}\{#AppExe}"; Parameters: "--stop"; Flags: runhidden waituntilterminated; RunOnceId: "StopServers"
+Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""MediCare Practice (LAN)"""; Flags: runhidden; RunOnceId: "FirewallRule"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\data\sessions"
 Type: filesandordirs; Name: "{app}\data\tmp"
 Type: files; Name: "{app}\data\my.ini"
+Type: filesandordirs; Name: "{app}\data\nginx"
 
 [Code]
 { PHP 8.2 and MariaDB need the Visual C++ 2015-2022 runtime (14.29 or newer). }

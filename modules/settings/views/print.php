@@ -39,7 +39,10 @@ $val = static fn (string $k) => old($k, $design[$k] ?? '');
                     <?php if ($design['header_image']): ?><img src="<?= e(upload_url($design['header_image'])) ?>" alt="" style="max-width:100%;max-height:90px;border:1px solid var(--border);border-radius:6px;margin-bottom:.4rem;display:block"><?php endif; ?>
                     <input class="input" type="file" name="header_image" accept="image/png,image/jpeg,image/gif,image/webp">
                     <?php if ($design['header_image']): ?><label class="check mt-1"><input type="checkbox" name="remove_header_image" value="1"> Remove header image</label><?php endif; ?></div>
-                <div class="field col-12"><label class="check"><input type="checkbox" name="show_logo" value="1"<?= checked((int) $design['show_logo']) ?>> Show organization logo</label></div>
+                <div class="field col-12 flex flex-wrap">
+                    <label class="check"><input type="checkbox" name="show_logo" value="1"<?= checked((int) $design['show_logo']) ?>> Show organization logo</label>
+                    <label class="check"><input type="checkbox" name="show_qr" value="1"<?= checked((int) ($design['show_qr'] ?? 1)) ?>> Show PHC QR code</label>
+                    <label class="check"><input type="checkbox" name="show_slogan" value="1"<?= checked((int) ($design['show_slogan'] ?? 1)) ?>> Show Urdu slogan</label></div>
                 <div class="field col-6"><label>Doctor Name / Title</label><input class="input" name="header_title" value="<?= e($val('header_title')) ?>" maxlength="200"></div>
                 <div class="field col-6"><label>Qualification Line</label><input class="input" name="header_subtitle" value="<?= e($val('header_subtitle')) ?>" maxlength="255"></div>
                 <div class="field col-6"><label>More Doctor Lines (one per line)</label><textarea class="input" name="header_lines" rows="3" maxlength="1000"><?= e($val('header_lines')) ?></textarea></div>
@@ -72,11 +75,12 @@ $val = static fn (string $k) => old($k, $design[$k] ?? '');
             <div class="card-header"><div class="card-title"><?= icon('info') ?> Layout Rules</div></div>
             <div class="card-body small">
                 <ul style="margin:0;padding-left:1.1rem">
-                    <li>Row 1: header image, or logo + doctor details + clinic info.</li>
-                    <li>Row 2: patient information · Row 3: vitals (only recorded ones).</li>
-                    <li>Body: 20% left column (complaints, symptoms, diagnosis, investigations, follow-up, history) and 80% Rx.</li>
-                    <li>Empty sections and their headings are hidden automatically.</li>
-                    <li>Thermal prints as a single-column receipt (80 mm).</li>
+                    <li>PHC standard: clinic name, PM&amp;DC / PHC reg. numbers, doctor, Ref. No., QR and slogan, then a red bar.</li>
+                    <li>Grey band: patient, S/o D/o W/o, no. of visit, time, date, address, contact.</li>
+                    <li>Left: B.P, pulse, temperature, RR, allergies, complaints, history, findings, investigations, dispensing stamp.</li>
+                    <li>Right: age, gender, weight, provisional diagnosis, Rx in the 3-line format with Urdu noskha, signature &amp; stamp.</li>
+                    <li>Footer: refill 0–4, contact number, clinic days &amp; timings. Hospital slip below the cut line (Settings → Rx Split).</li>
+                    <li>Thermal prints the same content as a single-column receipt (80 mm).</li>
                 </ul>
             </div>
         </div>

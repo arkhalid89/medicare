@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Modules\Visits;
 
 use App\Core\DB;
+use App\Core\Urdu;
 
 /**
  * Read access to medicines and the dosing masters for the consultation
@@ -13,7 +14,7 @@ final class MedicineCatalog
 {
     private const SELECT = 'SELECT m.id, m.name, m.generic_name, m.brand_name, m.strength, m.default_dose, m.dose_unit,
             m.default_duration, m.unit, m.pack_size, m.price, m.frequency_id, m.route_id, m.instruction_id, m.is_active,
-            df.name AS dosage_form, s.id AS source_id, s.name AS source_name, i.name AS instruction_name
+            df.name AS dosage_form, df.dose_type, s.id AS source_id, s.name AS source_name, i.name AS instruction_name
         FROM medicines m
         LEFT JOIN dosage_forms df ON df.id = m.dosage_form_id
         LEFT JOIN medicine_sources s ON s.id = m.source_id AND s.deleted_at IS NULL
@@ -59,7 +60,7 @@ final class MedicineCatalog
     public static function frequencies(bool $includeInactive = false): array
     {
         $rows = DB::all(
-            'SELECT id, name, code, doses_per_day, calc_mode, is_active FROM frequencies WHERE deleted_at IS NULL'
+            'SELECT id, name, code, doses_per_day, calc_mode, name_ur, is_active FROM frequencies WHERE deleted_at IS NULL'
             . ($includeInactive ? '' : ' AND is_active = 1') . ' ORDER BY display_order, name'
         );
         $out = [];
@@ -73,7 +74,7 @@ final class MedicineCatalog
     public static function routes(bool $includeInactive = false): array
     {
         $rows = DB::all(
-            'SELECT id, name, short_name FROM routes WHERE deleted_at IS NULL'
+            'SELECT id, name, short_name, name_ur FROM routes WHERE deleted_at IS NULL'
             . ($includeInactive ? '' : ' AND is_active = 1') . ' ORDER BY display_order, name'
         );
         $out = [];
@@ -88,10 +89,27 @@ final class MedicineCatalog
         return DB::column('SELECT name FROM instructions WHERE deleted_at IS NULL AND is_active = 1 ORDER BY display_order, name');
     }
 
-    /** Source id => display order, for Rx grouping. */
+    /** Instruction (English) => Urdu, for the patient noskha. */
+    public static function instructionsUrdu(): array
+    {
+        $map = Urdu::INSTRUCTIONS;
+        foreach (DB::pairs("SELECT name, name_ur FROM instructions WHERE deleted_at IS NULL AND name_ur IS NOT NULL AND name_ur <> ''") as $en => $ur) {
+            $map[$en] = $ur;
+        }
+        return $map;
+    }
+
+    /** Active source id => display order, for Rx grouping and the main-Rx source. */
     public static function sourceOrder(): array
     {
-        return array_map('intval', DB::pairs('SELECT id, display_order FROM medicine_sources'));
+        return array_map('intval', DB::pairs('SELECT id, display_order FROM medicine_sources WHERE deleted_at IS NULL AND is_active = 1'));
+    }
+
+    /** The source whose medicines form the main (unbilled) Rx. */
+    public static function mainSourceId(): ?int
+    {
+        $configured = (int) setting('rx_main_source_id', 0);
+        return PrescriptionMath::mainSource(self::sourceOrder(), $configured ?: null);
     }
 
     /**
@@ -108,11 +126,16 @@ final class MedicineCatalog
         $dose = (float) ($o['dose'] ?? $m['default_dose'] ?? 1);
         $duration = (int) ($o['duration_days'] ?? $m['default_duration'] ?? 0);
         $packSize = (float) ($m['pack_size'] ?? 1);
+        $doseType = (string) ($m['dose_type'] ?? '') ?: 'other';
+        $override = trim((string) ($o['dose_unit'] ?? ''));
+        $unit = ($override !== '' ? self::validUnit(Urdu::unitKey($override), $doseType) : null)
+            ?? self::validUnit(Urdu::unitKey($m['dose_unit'] ?? ''), $doseType)
+            ?? (Urdu::DOSE_CHOICES[$doseType] ?? Urdu::DOSE_CHOICES['other'])[0][0];
 
         $auto = null;
         if ($frequencyId) {
             $f = $frequencies[$frequencyId];
-            $auto = PrescriptionMath::quantity($dose, (float) $f['doses_per_day'], (string) $f['calc_mode'], $duration, $packSize);
+            $auto = PrescriptionMath::quantity($dose, (float) $f['doses_per_day'], (string) $f['calc_mode'], $duration, $packSize, self::unitFactor($unit));
         }
         $manual = (int) ($o['qty_manual'] ?? 0) === 1 || $auto === null;
         $quantity = $manual ? (float) ($o['quantity'] ?? 1) : $auto;
@@ -128,7 +151,8 @@ final class MedicineCatalog
             'strength'      => $m['strength'] ?? '',
             'dosage_form'   => $m['dosage_form'] ?? '',
             'dose'          => $dose,
-            'dose_unit'     => $m['dose_unit'] ?? '',
+            'dose_unit'     => $unit,
+            'dose_type'     => $doseType,
             'frequency_id'  => $frequencyId ?: null,
             'route_id'      => array_key_exists('route_id', $o) ? ($o['route_id'] ? (int) $o['route_id'] : null) : ($m['route_id'] ? (int) $m['route_id'] : null),
             'duration_days' => $duration,
@@ -142,5 +166,21 @@ final class MedicineCatalog
             'source_name'   => $m['source_name'] ?? '',
             'instructions'  => array_key_exists('instructions', $o) ? (string) $o['instructions'] : (string) ($m['instruction_name'] ?? ''),
         ];
+    }
+
+    /** The unit if it is allowed for this dose type (or any known unit for "other"), else null. */
+    public static function validUnit(string $unit, string $doseType): ?string
+    {
+        if ($unit === '' || !isset(Urdu::UNITS[$unit])) {
+            return null;
+        }
+        $allowed = Urdu::DOSE_CHOICES[$doseType][0] ?? [];
+        return in_array($unit, $allowed, true) || $doseType === 'other' ? $unit : null;
+    }
+
+    /** ml per teaspoon / tablespoon; 1 for everything else. */
+    public static function unitFactor(string $unit): float
+    {
+        return (float) (Urdu::UNITS[$unit][2] ?? 1);
     }
 }

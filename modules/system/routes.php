@@ -11,4 +11,8 @@ return [
     'system/recycle'         => ['GET', [SystemController::class, 'recycle'], 'records.delete'],
     'system/recycle/restore' => ['POST', [SystemController::class, 'restore'], 'records.delete'],
     'system/logs'            => ['GET', [SystemController::class, 'logs'], 'activity.view'],
+    'system/logs/preview'    => ['GET', [SystemController::class, 'logsPreview'], 'records.delete'],
+    'system/logs/clean'      => ['POST', [SystemController::class, 'logsClean'], 'records.delete'],
+    'system/purge/preview'   => ['GET', [SystemController::class, 'purgePreview'], 'db.reset'],
+    'system/purge'           => ['POST', [SystemController::class, 'purge'], 'db.reset'],
 ];

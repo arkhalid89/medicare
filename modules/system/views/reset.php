@@ -35,3 +35,53 @@ echo View::partial('page_header', [
             <p class="hint mt-2">Command-line alternative: <code>php database/reset.php --mode=clinical</code></p></div>
     </div>
 </div>
+
+<div class="card mt-2">
+    <div class="card-header"><div class="card-title"><?= icon('filter') ?> Delete by table &amp; date range</div><span class="muted small">Permanent · preview first · safety backup taken automatically</span></div>
+    <form method="post" action="<?= e(url('system/purge')) ?>" id="purge-form" class="card-body"
+          data-confirm="Permanently delete the selected data in this date range? A safety backup is taken first." data-confirm-ok="Delete permanently" data-loading="Deleting…">
+        <?= csrf_field() ?>
+        <div class="grid grid-2">
+            <div>
+                <?php foreach (\App\Core\DataPurger::DATASETS as $key => [$label, $desc]): ?>
+                    <label class="check purge-opt">
+                        <input type="checkbox" name="datasets[]" value="<?= e($key) ?>">
+                        <span><strong><?= e($label) ?></strong> <span class="badge badge-muted" data-count="<?= e($key) ?>">–</span><br><span class="muted small"><?= e($desc) ?></span></span>
+                    </label>
+                <?php endforeach; ?>
+            </div>
+            <div>
+                <div class="form-grid">
+                    <div class="field col-6"><label>From date <span class="req">*</span></label><input class="input" type="date" name="from" required></div>
+                    <div class="field col-6"><label>To date <span class="req">*</span></label><input class="input" type="date" name="to" required></div>
+                    <div class="field col-6"><label>Type <strong>DELETE</strong> to confirm</label><input class="input" name="confirm" autocomplete="off" required></div>
+                    <div class="field col-6"><label>Your password</label><input class="input" type="password" name="password" required autocomplete="current-password"></div>
+                </div>
+                <div class="alert alert-warning mt-2 mb-0"><?= icon('alert') ?><div>Counts update when you pick tables and dates. Deleted rows cannot be restored except from the safety backup.</div></div>
+            </div>
+        </div>
+        <div class="flex mt-2" style="justify-content:flex-end"><button type="submit" class="btn btn-danger"><?= icon('trash') ?> Delete Selected Data</button></div>
+    </form>
+</div>
+<style>.purge-opt{display:flex;align-items:flex-start;gap:.6rem;padding:.6rem .8rem;border:1px solid var(--border);border-radius:10px;margin-bottom:.5rem}</style>
+<script>
+(function () {
+    var f = document.getElementById('purge-form');
+    var update = APP.debounce(function () {
+        var d = new FormData(f), sets = d.getAll('datasets[]');
+        document.querySelectorAll('[data-count]').forEach(function (b) { b.textContent = '–'; });
+        if (!d.get('from') || !d.get('to') || !sets.length) return;
+        var q = 'from=' + encodeURIComponent(d.get('from')) + '&to=' + encodeURIComponent(d.get('to')) + sets.map(function (s) { return '&datasets[]=' + encodeURIComponent(s); }).join('');
+        var u = APP.url('system/purge/preview');
+        APP.ajax(u + (u.indexOf('?') === -1 ? '?' : '&') + q).then(function (r) {
+            if (!r.ok) return;
+            Object.keys(r.counts).forEach(function (k) {
+                var b = document.querySelector('[data-count="' + k + '"]');
+                b.textContent = r.counts[k] + ' row(s)';
+                b.className = 'badge ' + (r.counts[k] ? 'badge-danger' : 'badge-muted');
+            });
+        });
+    }, 300);
+    f.addEventListener('change', update);
+})();
+</script>

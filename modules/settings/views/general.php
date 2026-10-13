@@ -34,6 +34,24 @@ $logo = setting('org_logo');
             </div></div>
         </div>
         <div class="card">
+            <div class="card-header"><div class="card-title"><?= icon('shield') ?> PHC Prescription Letterhead</div><span class="muted small">Punjab Healthcare Commission standard</span></div>
+            <div class="card-body"><div class="form-grid">
+                <div class="field col-6"><label>PHC Reg. No.</label><input class="input" name="org_phc_reg_no" value="<?= e($val('org_phc_reg_no')) ?>" maxlength="50"></div>
+                <div class="field col-6"><label>PHC RL. No. (regular licence)</label><input class="input" name="org_phc_rl_no" value="<?= e($val('org_phc_rl_no')) ?>" maxlength="50"></div>
+                <div class="field col-12"><label>Clinic days &amp; timings</label><input class="input" name="clinic_timings" value="<?= e($val('clinic_timings')) ?>" maxlength="150" placeholder="Mon to Sat, 09:00 to 21:00"></div>
+                <div class="field col-12"><label>Slogan (Urdu)</label><input class="input urdu" lang="ur" name="org_slogan_ur" value="<?= e($val('org_slogan_ur')) ?>" maxlength="150"></div>
+                <div class="field col-12"><label>QR code from the PHC registration certificate (PNG / JPG)</label>
+                    <?php $qr = setting('org_qr_image'); ?>
+                    <div class="flex">
+                        <?php if ($qr): ?><img src="<?= e(upload_url($qr)) ?>" alt="" style="height:64px;border:1px solid var(--border);border-radius:6px;padding:2px;background:#fff"><?php endif; ?>
+                        <input class="input" type="file" name="org_qr_image" accept="image/png,image/jpeg,image/gif,image/webp">
+                    </div>
+                    <?php if ($qr): ?><label class="check mt-1"><input type="checkbox" name="remove_qr" value="1"> Remove QR image</label><?php endif; ?>
+                    <?= $err('org_qr_image') ?>
+                    <div class="hint">PM&amp;DC Reg. No. comes from each doctor's profile (Users).</div></div>
+            </div></div>
+        </div>
+        <div class="card">
             <div class="card-header"><div class="card-title"><?= icon('settings') ?> Regional &amp; Display</div></div>
             <div class="card-body"><div class="form-grid">
                 <div class="field col-4"><label>Currency Symbol</label><input class="input" name="currency_symbol" value="<?= e($val('currency_symbol')) ?>" maxlength="10"><?= $err('currency_symbol') ?></div>

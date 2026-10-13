@@ -238,9 +238,66 @@ function org_initials(): string
     return $initials ?: 'MC';
 }
 
+/** Label of a user class (super_admin …) or a role code (CD, PH …). */
 function role_label(?string $role): string
 {
-    return (string) config('permissions.roles.' . $role . '.label', ucfirst((string) $role));
+    $role = (string) $role;
+    $class = config('permissions.classes.' . $role);
+    if ($class !== null) {
+        return (string) $class;
+    }
+    return (string) config('permissions.roles.' . $role . '.name', ucfirst(str_replace('_', ' ', $role)));
+}
+
+/** Name of the logged-in user's primary role ("Receptionist / Front Desk"). */
+function user_role_name(?array $user = null): string
+{
+    $user = $user ?? auth();
+    return (string) ($user['role_name'] ?? role_label($user['role'] ?? ''));
+}
+
+/** A list from config/hospital.php, e.g. hospital('priorities'). */
+function hospital(string $key, mixed $default = []): mixed
+{
+    return config('hospital.' . $key, $default);
+}
+
+function branch_id(): ?int
+{
+    return \App\Core\Auth::branchId();
+}
+
+/** CNIC masked for roles without patients.cnic.full (Doc 1 §6). */
+function cnic_mask(?string $cnic): string
+{
+    return \App\Core\Scope::cnic($cnic);
+}
+
+function priority_badge(string $priority): string
+{
+    $p = hospital('priorities')[$priority] ?? [ucfirst($priority), 0];
+    $class = ['emergency' => 'badge-danger', 'pregnant' => 'badge-gold', 'disabled' => 'badge-gold', 'senior' => 'badge-gold', 'vip' => 'badge-info'][$priority] ?? 'badge-muted';
+    return '<span class="badge ' . $class . '">' . e($p[0]) . '</span>';
+}
+
+/** Generic coloured status chip for workflow states. */
+function status_chip(?string $status): string
+{
+    $status = (string) $status;
+    $map = [
+        'success' => ['completed', 'paid', 'settled', 'verified', 'released', 'accepted', 'approved', 'posted', 'received', 'final', 'done', 'dispensed', 'issued', 'active', 'pass', 'delivered', 'closed', 'processed', 'checked_in'],
+        'warning' => ['waiting', 'pending', 'open', 'partial', 'requested', 'submitted', 'draft', 'planned', 'proposed', 'in_progress', 'processing', 'scheduled', 'sample_pending', 'collected', 'result_entered', 'warn', 'booked', 'ordered', 'in_transit', 'counting', 'review', 'partially_received', 'partially_issued'],
+        'info'    => ['called', 'serving', 'under_review', 'reprocess_requested', 'sent', 'running', 'accepted_plan', 'ongoing'],
+        'danger'  => ['void', 'cancelled', 'rejected', 'no_show', 'fail', 'expired', 'quarantined', 'recalled', 'refunded', 'critical'],
+    ];
+    $class = 'badge-muted';
+    foreach ($map as $c => $list) {
+        if (in_array($status, $list, true)) {
+            $class = 'badge-' . $c;
+            break;
+        }
+    }
+    return '<span class="badge ' . $class . '">' . e(ucwords(str_replace('_', ' ', $status))) . '</span>';
 }
 
 // ---------------------------------------------------------------------------
@@ -318,11 +375,14 @@ function age_text(?string $dob, ?string $at = null): string
     if ($diff->invert) {
         return '';
     }
-    if ($diff->y > 0) {
+    if ($diff->y >= 5) {
         return $diff->y . ' Y';
     }
+    if ($diff->y > 0) {
+        return $diff->y . ' Y' . ($diff->m ? ' ' . $diff->m . ' M' : '');
+    }
     if ($diff->m > 0) {
-        return $diff->m . ' M';
+        return $diff->m . ' M' . ($diff->d ? ' ' . $diff->d . ' D' : '');
     }
     return $diff->d . ' D';
 }
@@ -400,4 +460,14 @@ function payment_badge(string $status): string
 {
     $class = ['Paid' => 'badge-success', 'Pending' => 'badge-warning', 'Free' => 'badge-info'][$status] ?? 'badge-muted';
     return '<span class="badge ' . $class . '">' . e($status) . '</span>';
+}
+
+/** Human age band of a reference range ("0 – 11 y", "18 y +"). */
+function age_range_text(int $minDays, int $maxDays): string
+{
+    $f = static fn (int $d): string => $d >= 365 ? round($d / 365, 1) . ' y' : ($d >= 30 ? round($d / 30) . ' m' : $d . ' d');
+    if ($maxDays >= 54750) {
+        return $minDays === 0 ? 'All ages' : $f($minDays) . ' +';
+    }
+    return $f($minDays) . ' – ' . $f($maxDays + 1);
 }

@@ -143,6 +143,10 @@ final class Backup
         $pdo = DB::pdo();
         $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
         try {
+            // A restore replaces the WHOLE database: tables that the backup does
+            // not contain (e.g. modules added after an older backup) are removed
+            // too, so the migrator rebuilds them cleanly afterwards.
+            Installer::dropAllTables();
             foreach (SqlSplitter::fromFile($path) as $statement) {
                 $pdo->exec($statement);
             }
@@ -150,6 +154,7 @@ final class Backup
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
         }
         Settings::flush();
+        Rbac::flush();
         self::applyRetention();
         ActivityLog::record('Backup restored', 'backup', basename($path), 'Database restored from ' . basename($path) . '; previous data archived as ' . $archive);
         return $archive;
@@ -162,7 +167,7 @@ final class Backup
         foreach (glob(self::dir() . '/*.sql') ?: [] as $file) {
             $name = basename($file);
             $kind = 'manual';
-            foreach (['auto', 'pre-restore', 'pre-reset'] as $k) {
+            foreach (['auto', 'pre-restore', 'pre-reset', 'pre-upgrade'] as $k) {
                 if (str_contains($name, '_' . $k)) {
                     $kind = $k;
                 }

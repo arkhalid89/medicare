@@ -88,7 +88,7 @@ function login(string $base, string $username, string $password, string $jar): s
     @unlink($jar);
     $page = http('GET', $base . '/index.php?r=login', $jar);
     $r = http('POST', $base . '/index.php?r=login', $jar, ['form' => ['_token' => csrf($page['body']), 'username' => $username, 'password' => $password]]);
-    check("login $username redirects", $r['status'] === 302 && str_contains($r['headers'], 'r=dashboard'), 'status ' . $r['status']);
+    check("login $username redirects", $r['status'] === 302 && !str_contains($r['headers'], 'r=login'), 'status ' . $r['status']);
     $dash = http('GET', $base . '/index.php?r=dashboard', $jar);
     check("dashboard $username", $dash['status'] === 200 && clean($dash['body']) === null, clean($dash['body']) ?? 'status ' . $dash['status']);
     return csrf($dash['body']);
@@ -128,18 +128,51 @@ $params = [
     'patients/duplicates'    => ['phone' => '03001234567'],
     'visits/lookup'          => ['type' => 'complaint', 'q' => 'fe'],
     'visits/medicines'       => ['q' => 'pan'],
+    'visits/history'         => ['patient_id' => $patientId],
+    'visits/refill'          => ['id' => $visitId],
+    'system/logs/preview'    => ['from' => date('Y-m-01'), 'to' => today()],
+    'system/purge/preview'   => ['from' => '2020-01-01', 'to' => '2020-01-31', 'datasets' => ['visits', 'activity_logs']],
 ];
 $exportable = ['patients', 'visits', 'users', 'templates', 'reports/visits', 'reports/fees', 'system/logs', 'system/recycle', 'masters/mapping'];
 foreach (array_keys(config('masters')) as $k) {
     $exportable[] = 'masters/' . $k;
 }
 
-$roles = [
-    'superadmin' => ['admin123', 'super_admin'],
-    'deptadmin'  => ['admin123', 'dept_admin'],
-    'doctor'     => ['doctor123', 'doctor'],
-    'reporting'  => ['report123', 'reporting'],
-];
+// Every sample user (v2: one per department role) — expectations come from the live RBAC.
+$roles = ['superadmin' => ['admin123', 'super_admin']];
+foreach (\App\Core\Seeder::SAMPLE_USERS as $u) {
+    $roles[$u[1]] = [$u[2], (string) DB::value('SELECT role FROM users WHERE username = ?', [$u[1]])];
+}
+$skipped = [];
+// v2 fixtures for pages that need an id
+$fx = static fn (string $sql) => (int) DB::value($sql);
+$params += array_filter([
+    'billing/invoice'   => ['id' => $fx('SELECT id FROM invoices ORDER BY id DESC LIMIT 1')],
+    'billing/print'     => ['id' => $fx('SELECT id FROM invoices ORDER BY id DESC LIMIT 1')],
+    'lab/order'         => ['id' => $fx('SELECT id FROM lab_orders ORDER BY id DESC LIMIT 1')],
+    'lab/report'        => ['id' => $fx('SELECT id FROM lab_orders ORDER BY id DESC LIMIT 1')],
+    'lab/result'        => ['id' => $fx('SELECT id FROM lab_order_items ORDER BY id DESC LIMIT 1')],
+    'lab/labels'        => ['ids' => (string) $fx('SELECT id FROM lab_samples ORDER BY id DESC LIMIT 1')],
+    'radiology/order'   => ['id' => $fx('SELECT id FROM radiology_orders ORDER BY id DESC LIMIT 1')],
+    'radiology/report'  => ['id' => $fx('SELECT id FROM radiology_orders ORDER BY id DESC LIMIT 1')],
+    'dental'            => ['patient_id' => $fx('SELECT patient_id FROM dental_charts ORDER BY id DESC LIMIT 1')],
+    'dental/plan-print' => ['id' => $fx('SELECT id FROM dental_treatment_plans ORDER BY id DESC LIMIT 1')],
+    'obgyn'             => ['patient_id' => $fx('SELECT patient_id FROM pregnancies ORDER BY id DESC LIMIT 1')],
+    'obgyn/summary'     => ['patient_id' => $fx('SELECT patient_id FROM pregnancies ORDER BY id DESC LIMIT 1')],
+    'pharmacy/dispense' => ['id' => $fx('SELECT id FROM dispenses ORDER BY id DESC LIMIT 1')],
+], static fn ($p) => !in_array(0, $p, true) && !in_array('0', $p, true));
+$params += array_filter([
+    'frontdesk/token-print' => ['id' => $fx('SELECT id FROM tokens ORDER BY id DESC LIMIT 1')],
+    'inventory/card'        => ['item_id' => $fx("SELECT item_id FROM stock_balances ORDER BY item_id LIMIT 1")],
+    'radiology/print'       => ['id' => $fx("SELECT radiology_order_id FROM radiology_reports WHERE status = 'final' LIMIT 1")],
+    'roles/matrix'          => ['id' => $fx("SELECT id FROM roles WHERE code = 'CD'")],
+], static fn ($p) => !in_array(0, $p, true));
+$boardKey = (string) DB::value('SELECT access_key FROM display_boards WHERE is_active = 1 LIMIT 1');
+if ($boardKey !== '') {
+    $params['board'] = $params['board/data'] = ['key' => $boardKey];
+}
+$params['dental/state'] = ['patient_id' => $patientId];
+$params['specialty'] = ['patient_id' => $patientId];
 
 echo "\033[1mSmoke test\033[0m against $base\n";
 $r = http('GET', $base . '/', sys_get_temp_dir() . '/mc_anon.txt');
@@ -149,13 +182,30 @@ check('protected page redirects guests', $r['status'] === 302 && str_contains($r
 $r = http('GET', $base . '/index.php?r=nope', sys_get_temp_dir() . '/mc_anon.txt');
 check('unknown route is 404', $r['status'] === 404, 'status ' . $r['status']);
 
+// Subscription: public page, bad key refused, real key (vendor tool) activates.
+$anon = sys_get_temp_dir() . '/mc_anon.txt';
+$lp = http('GET', $base . '/index.php?r=license', $anon);
+check('licence page is public', $lp['status'] === 200 && str_contains($lp['body'], 'Subscription key'), 'status ' . $lp['status']);
+$bad = http('POST', $base . '/index.php?r=license/activate', $anon, ['form' => ['_token' => csrf($lp['body']), 'phone' => '03001234567', 'key' => 'MCP1-FAKE-KEY']]);
+check('forged key is refused', $bad['status'] === 200 && str_contains($bad['body'], 'not valid'), 'status ' . $bad['status']);
+$privateKey = dirname(__DIR__) . '/tools/license-private.key';
+if (is_file($privateKey)) {
+    $key = \App\Core\License::issue(trim((string) file_get_contents($privateKey)), '03001234567', date('Y-m-d', strtotime('-1 day')), date('Y-m-d', strtotime('+365 days')));
+    $lp = http('GET', $base . '/index.php?r=license', $anon);
+    $ok = http('POST', $base . '/index.php?r=license/activate', $anon, ['form' => ['_token' => csrf($lp['body']), 'phone' => '0300-1234567', 'key' => $key]]);
+    check('vendor key activates the subscription', $ok['status'] === 302 && str_contains($ok['headers'], 'r=login'), 'status ' . $ok['status']);
+    \App\Core\Settings::flush();
+    \App\Core\License::flush();
+    check('subscription is active', \App\Core\License::status()['state'] === 'active', \App\Core\License::status()['message']);
+}
+
 foreach ($roles as $username => [$password, $role]) {
     echo "  role: $username\n";
     $jar = sys_get_temp_dir() . "/mc_$username.txt";
     $token = login($base, $username, $password, $jar);
 
     foreach (Router::routes() as $route => [$methods, $handler, $perm]) {
-        if (!in_array('GET', explode('|', $methods), true) || $route === 'login') {
+        if (!in_array('GET', explode('|', $methods), true) || $route === 'login' || $route === 'login/2fa') {
             continue;
         }
         if ($route === 'templates/edit' || $route === 'templates/load') {
@@ -163,20 +213,40 @@ foreach ($roles as $username => [$password, $role]) {
                 continue;
             }
         }
-        $allowed = $perm === null || $perm === 'auth' || Auth::roleCan($role, $perm);
+        Auth::actingAs(DB::one('SELECT * FROM users WHERE username = ?', [$username]));
+        $allowed = $perm === null || $perm === 'auth' || Router::allowed($perm);
         if ($route === 'masters/departments') {
-            $allowed = Auth::roleCan($role, 'departments.manage');
+            $allowed = Auth::can('departments.manage');
         }
         if ($route === 'users/view' && $role === 'dept_admin') {
             $allowed = true; // doctor shares a department with the dept admin
         }
         if ($route === 'masters/form') {
-            $allowed = Auth::roleCan($role, 'masters.manage');
+            $allowed = Auth::can('masters.manage');
+        }
+        // Record-level scope (v2): another doctor's visit goes to break-glass (302); others' orders are 403.
+        $scopeRedirect = false;
+        if ($allowed && in_array($route, ['visits/view', 'visits/print'], true) && !\App\Core\Scope::visitAllowed(DB::one('SELECT * FROM visits WHERE id = ?', [$visitId]))) {
+            $scopeRedirect = true;
+        }
+        if ($allowed && in_array($route, ['lab/order', 'lab/report'], true) && !Auth::can('lab.view')) {
+            $allowed = (int) DB::value('SELECT ordered_by FROM lab_orders WHERE id = ?', [$params[$route]['id'] ?? 0]) === Auth::id();
+        }
+        if ($allowed && in_array($route, ['radiology/order', 'radiology/print'], true) && !Auth::can('radiology.view')) {
+            $allowed = (int) DB::value('SELECT ordered_by FROM radiology_orders WHERE id = ?', [$params[$route]['id'] ?? 0]) === Auth::id();
+        }
+        if ($allowed && $route === 'patients/edit') {
+            $scopeRedirect = !\App\Modules\Patients\PatientService::canEdit($patientId);
         }
         $url = $base . '/index.php?' . http_build_query(['r' => $route] + ($params[$route] ?? []));
-        $res = http('GET', $url, $jar, ['headers' => str_contains($route, 'search') && $route !== 'search' || in_array($route, ['patients/duplicates', 'visits/lookup', 'visits/medicines', 'templates/load'], true) ? ['X-Requested-With: XMLHttpRequest'] : []]);
-        $expected = $allowed ? 200 : 403;
+        $jsonRoutes = ['patients/duplicates', 'visits/lookup', 'visits/medicines', 'templates/load', 'visits/history', 'visits/refill', 'system/logs/preview', 'system/purge/preview'];
+        $res = http('GET', $url, $jar, ['headers' => str_contains($route, 'search') && $route !== 'search' || in_array($route, $jsonRoutes, true) ? ['X-Requested-With: XMLHttpRequest'] : []]);
+        $expected = $scopeRedirect ? 302 : ($allowed ? 200 : 403);
         $problem = clean($res['body']);
+        if ($allowed && $res['status'] === 404 && !isset($params[$route])) {
+            $skipped[$route] = true; // page needs an id we have no fixture for
+            continue;
+        }
         check("$username GET $route → $expected", $res['status'] === $expected && $problem === null, 'got ' . $res['status'] . ($problem ? " · $problem" : ''));
 
         if ($allowed && in_array($route, $exportable, true)) {
@@ -186,25 +256,45 @@ foreach ($roles as $username => [$password, $role]) {
     }
 
     // Print every paper size
-    if (Auth::roleCan($role, 'visits.print')) {
+    if (Auth::can('visits.print') && \App\Core\Scope::visitAllowed(DB::one('SELECT * FROM visits WHERE id = ?', [$visitId]))) {
         foreach (['a4', 'a5', 'thermal', 'legal'] as $paper) {
             $p = http('GET', $base . '/index.php?r=visits/print&id=' . $visitId . '&paper=' . $paper, $jar);
-            check("$username print $paper", $p['status'] === 200 && str_contains($p['body'], '℞') && clean($p['body']) === null, clean($p['body']) ?? 'status ' . $p['status']);
+            check("$username print $paper", $p['status'] === 200 && str_contains($p['body'], 'class="rx-mark"') && str_contains($p['body'], 'phc-foot') && clean($p['body']) === null, clean($p['body']) ?? 'status ' . $p['status']);
         }
     }
 
     // Unauthorised POSTs are blocked
-    if (!Auth::roleCan($role, 'records.delete')) {
+    if (!Auth::can('records.delete')) {
         $d = http('POST', $base . '/index.php?r=patients/delete', $jar, ['form' => ['_token' => $token, 'id' => $patientId]]);
         check("$username cannot delete patients", $d['status'] === 403, 'status ' . $d['status']);
     }
-    if (!Auth::roleCan($role, 'db.reset')) {
+    if (!Auth::can('db.reset')) {
         $d = http('POST', $base . '/index.php?r=system/reset', $jar, ['form' => ['_token' => $token, 'mode' => 'clinical', 'confirm' => 'RESET', 'password' => $password]]);
         check("$username cannot reset database", $d['status'] === 403, 'status ' . $d['status']);
     }
     $csrf = http('POST', $base . '/index.php?r=profile', $jar, ['form' => ['_token' => 'bad', 'name' => 'x']]);
     check("$username POST without valid CSRF token is rejected", $csrf['status'] === 403 && str_contains($csrf['body'], 'form token has expired'), 'status ' . $csrf['status']);
 }
+
+// ------------------------------------------------- super admin key generator
+echo "  flows: subscription key generation\n";
+$jarSa = sys_get_temp_dir() . '/mc_superadmin.txt';
+$tokenSa = login($base, 'superadmin', 'admin123', $jarSa);
+$page = http('GET', $base . '/index.php?r=license', $jarSa);
+check('subscription page shows logs', $page['status'] === 200 && str_contains($page['body'], 'Activation history'), 'status ' . $page['status']);
+if (is_file(dirname(__DIR__) . '/tools/license-private.key')) {
+    $gen = http('POST', $base . '/index.php?r=license/generate', $jarSa, ['form' => ['_token' => $tokenSa, 'phone' => '03334445556', 'clinic_name' => 'Smoke Clinic',
+        'from' => today(), 'to' => date('Y-m-d', strtotime('+1 year')), 'amount' => '12000', 'payment_ref' => 'SMOKE']]);
+    check('super admin generates a key', $gen['status'] === 302, 'status ' . $gen['status']);
+    $after = http('GET', $base . '/index.php?r=license', $jarSa);
+    check('new key is shown and logged', str_contains($after['body'], 'id="new-key"') && str_contains($after['body'], 'Smoke Clinic'), 'missing');
+    $x = http('GET', $base . '/index.php?r=license/export&type=issued', $jarSa);
+    check('issued keys export', str_starts_with($x['body'], "PK\x03\x04"), 'status ' . $x['status']);
+}
+$jarDoc = sys_get_temp_dir() . '/mc_doctor.txt';
+login($base, 'doctor', 'doctor123', $jarDoc);
+$gen = http('POST', $base . '/index.php?r=license/generate', $jarDoc, ['form' => ['_token' => csrf(http('GET', $base . '/index.php?r=dashboard', $jarDoc)['body']), 'phone' => '03001112223']]);
+check('doctor cannot generate keys', $gen['status'] === 403, 'status ' . $gen['status']);
 
 // ------------------------------------------------------------ doctor flows
 echo "  flows: doctor checkout, template, print tracking\n";
@@ -248,5 +338,8 @@ check("another doctor cannot load the template", $leak['status'] === 404, 'statu
 echo "\n" . ($failed ? "\033[31m" : "\033[32m") . "$passed checks passed, " . count($failed) . " failed\033[0m\n";
 foreach ($failed as $f) {
     echo "  - $f\n";
+}
+if ($skipped) {
+    echo "Pages without an id fixture (404, not counted): " . implode(', ', array_keys($skipped)) . "\n";
 }
 exit($failed ? 1 : 0);

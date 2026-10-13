@@ -58,7 +58,7 @@ $cls = static fn (string $f): string => isset($fieldErrors[$f]) ? ' is-invalid' 
                         <input class="input<?= $cls($field) ?>" type="number" name="<?= e($field) ?>" value="<?= e(is_numeric($v) ? num($v) : $v) ?>"
                                min="<?= e((string) ($f['min'] ?? 0)) ?>" step="<?= $f['type'] === 'int' ? '1' : '0.01' ?>">
                     <?php else: ?>
-                        <input class="input<?= $cls($field) ?>" name="<?= e($field) ?>" value="<?= e($val($field)) ?>" maxlength="<?= (int) ($f['max'] ?? 255) ?>" placeholder="<?= e($f['placeholder'] ?? '') ?>">
+                        <input class="input<?= $cls($field) ?><?= !empty($f['rtl']) ? ' urdu' : '' ?>" name="<?= e($field) ?>" value="<?= e($val($field)) ?>" maxlength="<?= (int) ($f['max'] ?? 255) ?>" placeholder="<?= e($f['placeholder'] ?? '') ?>"<?= !empty($f['rtl']) ? ' dir="rtl" lang="ur"' : '' ?>>
                     <?php endif; ?>
                     <?php if (!empty($f['help'])): ?><div class="hint"><?= e($f['help']) ?></div><?php endif; ?>
                     <?= $err($field) ?>

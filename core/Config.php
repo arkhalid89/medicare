@@ -11,7 +11,7 @@ namespace App\Core;
  */
 final class Config
 {
-    private const SEPARATE_FILES = ['permissions', 'masters', 'menu'];
+    private const SEPARATE_FILES = ['permissions', 'masters', 'menu', 'hospital'];
 
     private static array $items = [];
     private static string $dir = '';

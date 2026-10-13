@@ -42,7 +42,7 @@ final class Router
     {
         $route = self::current();
         if ($route === '') {
-            $route = Auth::check() ? 'dashboard' : 'login';
+            $route = Auth::check() ? Auth::homeRoute() : 'login';
         }
 
         $routes = self::routes();
@@ -69,7 +69,26 @@ final class Router
                 }
                 redirect('login');
             }
-            if ($permission !== 'auth' && !Auth::can($permission)) {
+            // Subscription expired while logged in: end the session.
+            if (!License::allowsLogin()) {
+                $message = License::status()['message'];
+                Auth::logout();
+                Session::start();
+                if (is_ajax()) {
+                    json_response(['ok' => false, 'message' => $message, 'login' => true], 401);
+                }
+                Session::flash('error', $message);
+                redirect('license');
+            }
+            // Roles flagged "2FA" must set up an authenticator first (when enforced).
+            if (Auth::mustSetupTwoFactor() && !in_array($route, ['profile/2fa', 'logout', 'profile/password'], true)) {
+                if (is_ajax()) {
+                    json_response(['ok' => false, 'message' => 'Please set up two-factor authentication first.'], 403);
+                }
+                Session::flash('warning', 'Your role requires two-factor authentication. Please set it up to continue.');
+                redirect('profile/2fa');
+            }
+            if ($permission !== 'auth' && !self::allowed($permission)) {
                 ActivityLog::record('Access denied', 'auth', null, 'Blocked access to "' . $route . '"');
                 abort(403);
             }
@@ -81,5 +100,11 @@ final class Router
 
         [$class, $action] = $handler;
         (new $class())->$action();
+    }
+
+    /** 'a.b' = one permission; 'a.b|c.d' = any of them. */
+    public static function allowed(string $permission): bool
+    {
+        return str_contains($permission, '|') ? Auth::canAny(explode('|', $permission)) : Auth::can($permission);
     }
 }

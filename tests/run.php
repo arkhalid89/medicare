@@ -20,6 +20,10 @@ use App\Core\Auth;
 use App\Core\Backup;
 use App\Core\CodeGenerator;
 use App\Core\Config;
+use App\Core\DataPurger;
+use App\Core\License;
+use App\Core\Migrator;
+use App\Core\Urdu;
 use App\Core\DB;
 use App\Core\Exporter;
 use App\Core\Installer;
@@ -32,6 +36,8 @@ use App\Core\Validator;
 use App\Core\XlsxWriter;
 use App\Modules\Patients\PatientService;
 use App\Modules\Templates\TemplateService;
+use App\Modules\Visits\ClinicalItems;
+use App\Modules\Visits\Directions;
 use App\Modules\Visits\PrescriptionMath;
 use App\Modules\Visits\VisitService;
 
@@ -176,6 +182,11 @@ test('liquids convert to whole billing units', function () {
     eq(2.0, PrescriptionMath::quantity(10, 3, 'daily', 5, 120));  // 150 ml → 2 × 120 ml
     eq(1.0, PrescriptionMath::quantity(10, 3, 'daily', 4, 120));  // exactly 120 ml
 });
+test('teaspoon / tablespoon doses convert to ml before billing bottles', function () {
+    eq(1.0, PrescriptionMath::quantity(1, 3, 'daily', 3, 60, 5));     // 1 tsp TDS 3 days = 45 ml → 1 × 60 ml
+    eq(3.0, PrescriptionMath::quantity(2, 2, 'daily', 5, 120, 15));   // 2 tbsp BD 5 days = 300 ml → 3 × 120 ml
+    eq(2.0, PrescriptionMath::quantity(0.5, 2, 'daily', 2, 1, 1));    // ½ tablet BD 2 days
+});
 test('bill matches the BRD example (Rs. 3,850)', function () {
     $b = PrescriptionMath::bill([['quantity' => 1, 'unit_price' => 2450]], 'amount', 100, 0, 1500, 'Paid');
     eq(2450.0, $b['medicines_total']);
@@ -195,14 +206,26 @@ test('percentage discount, tax, cap and free consultation', function () {
     eq(121.0, $capped['discount_amount'], 'discount cannot exceed the medicines total');
     eq(0.0, $capped['grand_total']);
 });
-test('Rx groups follow source order, unassigned last', function () {
-    $lines = [['source_id' => 3], ['source_id' => null], ['source_id' => 1], ['source_id' => 3]];
-    $g = PrescriptionMath::assignGroups($lines, true, [1 => 1, 3 => 2]);
-    eq([2, 3, 1, 2], array_column($g, 'rx_group'));
-    $off = PrescriptionMath::assignGroups($lines, false, [1 => 1, 3 => 2]);
-    eq([1, 1, 1, 1], array_column($off, 'rx_group'), 'split disabled');
-    $single = PrescriptionMath::assignGroups([['source_id' => 3], ['source_id' => 3]], true, []);
-    eq([1, 1], array_column($single, 'rx_group'), 'one source = single Rx');
+test('main Rx = exactly one source (order 1, not billed); every other source and no-source go below the cut', function () {
+    $lines = [['source_id' => 3], ['source_id' => null], ['source_id' => 1], ['source_id' => 4], ['source_id' => 3]];
+    $order = [1 => 1, 3 => 2, 4 => 5];
+    $g = PrescriptionMath::assignGroups($lines, true, $order);
+    eq([2, 4, 1, 3, 2], array_column($g, 'rx_group'), 'no-source medicines last on the slip');
+    eq([0, 0, 1, 0, 0], array_column($g, 'is_main_rx'));
+    eq([1, 1, 0, 1, 1], array_column($g, 'billable'));
+    $chosen = PrescriptionMath::assignGroups($lines, true, $order, 3);
+    eq([1, 4, 2, 3, 1], array_column($chosen, 'rx_group'), 'configured main source');
+    // Prescription without the main source: its lowest-order source becomes the main Rx (never empty).
+    $noMain = PrescriptionMath::assignGroups([['source_id' => 4], ['source_id' => 3], ['source_id' => null], ['source_id' => 9]], true, $order);
+    eq([0, 1, 0, 0], array_column($noMain, 'is_main_rx'), 'source 3 (order 2) becomes main when source 1 is absent');
+    eq([2, 1, 4, 3], array_column($noMain, 'rx_group'), 'inactive/unknown source 9 after active ones, no-source last');
+    eq(null, PrescriptionMath::effectiveMain([['source_id' => null]], $order, null), 'no source = no main');
+    $off = PrescriptionMath::assignGroups($lines, false, $order);
+    eq([1, 1, 1, 1, 1], array_column($off, 'rx_group'), 'split disabled');
+    eq([1, 1, 1, 1, 1], array_column($off, 'billable'), 'split disabled bills everything');
+    $bill = PrescriptionMath::bill([['quantity' => 2, 'unit_price' => 100, 'billable' => 0], ['quantity' => 1, 'unit_price' => 50, 'billable' => 1]], 'amount', 0, 0, 500, 'Paid');
+    eq(50.0, $bill['medicines_total'], 'main-Rx medicines are not billed');
+    eq(550.0, $bill['grand_total']);
 });
 
 // ============================================================================
@@ -221,16 +244,37 @@ test('money and number formatting', function () {
     eq('2.5', num('2.50'));
     eq('10', num('10.00'));
 });
-test('age text from date of birth', function () {
+test('age text from date of birth (months and days for infants)', function () {
     eq('10 Y', age_text(date('Y-m-d', strtotime('-10 years -2 days'))));
-    eq('3 M', age_text(date('Y-m-d', strtotime('-3 months -1 day'))));
+    eq('3 M 1 D', age_text(date('Y-m-d', strtotime('-3 months -1 day'))));
+    eq('2 Y 4 M', age_text(date('Y-m-d', strtotime('-2 years -4 months'))));
+});
+test('age in years / months / days <-> date of birth', function () {
+    $dob = PatientService::dobFromAge(0, 3, 10, '2026-09-26');
+    eq('2026-06-16', $dob);
+    eq([0, 3, 10], PatientService::ageParts($dob, '2026-09-26'));
+    [$clean] = PatientService::validate(['name' => 'Baby', 'gender' => 'Female', 'age_years' => '0', 'age_months' => '5', 'age_days' => '2']);
+    eq(1, $clean['dob_estimated']);
+    eq(PatientService::dobFromAge(0, 5, 2), $clean['dob']);
+});
+test('Urdu fractions and units', function () {
+    eq('½', Urdu::fraction(0.5));
+    eq('1½', Urdu::fraction(1.5));
+    eq('⅓', Urdu::fraction(0.333));
+    eq('¼', Urdu::fraction(0.25));
+    eq('2', Urdu::fraction(2));
+    eq('tab', Urdu::unitKey('Tablet'));
+    eq('solid', Urdu::guessDoseType('Tablet'));
+    eq('liquid', Urdu::guessDoseType('Oral Suspension'));
 });
 test('validator rules', function () {
     $v = (new Validator(['a' => '', 'b' => 'x', 'c' => '5', 'd' => '2026-02-30', 'e' => 'bad']))
         ->required('a', 'A')->numeric('b', 'B')->integer('c', 'C', 1, 3)->date('d', 'D')->email('e', 'E');
     eq(['a', 'b', 'c', 'd', 'e'], array_keys($v->errors()));
 });
-test('plain-text passwords (current mode) and bcrypt upgrade path', function () {
+test('plain-text passwords and bcrypt upgrade path', function () {
+    $mode = config('security.password_mode');
+    Config::set('security.password_mode', 'plain');
     eq('admin123', Password::hash('admin123'));
     ok(Password::verify('admin123', 'admin123'), 'plain verify');
     ok(!Password::verify('wrong', 'admin123'), 'plain reject');
@@ -238,7 +282,7 @@ test('plain-text passwords (current mode) and bcrypt upgrade path', function () 
     Config::set('security.password_mode', 'bcrypt');
     ok(Password::needsUpgrade('admin123'), 'plain password is upgraded in bcrypt mode');
     ok(Password::isHash(Password::hash('x123456')), 'bcrypt mode hashes');
-    Config::set('security.password_mode', 'plain');
+    Config::set('security.password_mode', $mode);
 });
 test('SQL splitter respects quotes and comments', function () {
     $sql = "-- comment\nINSERT INTO t VALUES ('a;b', 'it''s', 'x\\'y;');\nSELECT 1; -- trailing\nSELECT \"q;\";";
@@ -275,10 +319,28 @@ test('fresh install into the test database', function () {
     Installer::install(['demo' => false]);
     DB::disconnect();
     Settings::flush();
-    eq(5, (int) DB::value('SELECT COUNT(*) FROM users'));
+    eq(1 + count(\App\Core\Seeder::SAMPLE_USERS), (int) DB::value('SELECT COUNT(*) FROM users'));
     eq(28, (int) DB::value('SELECT COUNT(*) FROM medicines'));
-    eq(8, (int) DB::value('SELECT COUNT(*) FROM print_designs'), '4 paper designs per doctor');
+    eq(4 * (int) DB::value("SELECT COUNT(*) FROM users WHERE role = 'doctor'"), (int) DB::value('SELECT COUNT(*) FROM print_designs'), '4 paper designs per doctor');
     eq(10, (int) DB::value('SELECT COUNT(*) FROM frequencies'));
+    eq(Migrator::LATEST, Migrator::current(), 'fresh install is at the latest schema');
+    ok(Migrator::tableExists('license_issued') && Migrator::tableExists('license_activations'), 'licence log tables');
+    eq('دن میں تین بار', DB::value("SELECT name_ur FROM frequencies WHERE code = 'TDS'"));
+});
+test('migration upgrades an older database without losing data', function () {
+    DB::run('ALTER TABLE visits DROP COLUMN findings');
+    DB::run('ALTER TABLE dosage_forms DROP COLUMN dose_type');
+    DB::run("UPDATE frequencies SET name_ur = NULL");
+    DB::run('DROP TABLE license_activations');
+    \App\Core\Settings::set(['schema_version' => '1']);
+    ok(!Migrator::columnExists('visits', 'findings'), 'column removed for the test');
+    Migrator::runIfNeeded();
+    \App\Core\Settings::flush();
+    ok(Migrator::columnExists('visits', 'findings'), 'column restored');
+    eq('solid', DB::value("SELECT dose_type FROM dosage_forms WHERE name = 'Tablet'"));
+    eq('دن میں دو بار', DB::value("SELECT name_ur FROM frequencies WHERE code = 'BD'"));
+    ok(Migrator::tableExists('license_activations'), 'v3 table restored');
+    eq(Migrator::LATEST, Migrator::current());
 });
 test('employee codes follow the pattern', function () {
     eq('EMP-' . date('Y') . '-0001', user('superadmin')['employee_code']);
@@ -287,7 +349,9 @@ test('employee codes follow the pattern', function () {
 test('every route points to an existing controller method', function () {
     foreach (Router::routes() as $route => [$methods, $handler, $perm]) {
         ok(method_exists($handler[0], $handler[1]), "route $route → {$handler[0]}::{$handler[1]} missing");
-        ok($perm === null || $perm === 'auth' || isset(config('permissions.labels')[$perm]), "route $route uses unknown permission $perm");
+        foreach ($perm === null || $perm === 'auth' ? [] : explode('|', $perm) as $p) {
+            ok(isset(config('permissions.permissions')[$p]), "route $route uses unknown permission $p");
+        }
     }
     ok(count(Router::routes()) > 60, 'expected more than 60 routes');
     foreach (glob(BASE_PATH . '/modules/*/routes.php') as $file) {
@@ -381,16 +445,25 @@ test('checkout saves patient, visit, clinical lists, medicines and bill', functi
     eq('1.00', $q['Calpol Syrup']);
     $prices = array_column($v['medicines'], 'unit_price', 'medicine_name');
     eq('40.00', $prices['Augmentin'], 'price override kept');
-    // 15×3 + 10×40 + 1×450 + 1×120 = 1015; −50 = 965; +1500 = 2465
-    eq('1015.00', $v['medicines_total']);
-    eq('965.00', $v['medicine_net']);
-    eq('2465.00', $v['grand_total']);
+    // Main Rx (Local Pharmacy: Panadol, Calpol) is bought outside — not billed.
+    // Billed: Augmentin 10×40 + Ventolin 1×450 = 850; −50 = 800; +1500 = 2300
+    eq('850.00', $v['medicines_total']);
+    eq('800.00', $v['medicine_net']);
+    eq('2300.00', $v['grand_total']);
+    $billable = array_column($v['medicines'], 'billable', 'medicine_name');
+    eq(0, (int) $billable['Panadol']);
+    eq(1, (int) $billable['Augmentin']);
+    eq('tsp', array_column($v['medicines'], 'dose_unit', 'medicine_name')['Calpol Syrup']);
     eq(2, count($v['items']['complaints']), 'master + free-text complaint');
     eq(null, $v['items']['complaints'][1]['id'], 'free text has no master id');
     eq(1, count($v['items']['diagnoses']));
-    eq(3, count($v['groups']), 'Local Pharmacy, Hospital Stock, Distributor B');
-    eq('Local Pharmacy', $v['groups'][0]['source_name']);
+    eq(3, count($v['groups']), 'main Rx, Hospital Stock, Distributor B');
+    eq(true, $v['groups'][0]['is_main']);
     eq('Hospital Stock', $v['groups'][1]['source_name']);
+    eq(1, $v['visit_number']);
+    eq(2300.0, $v['day_cumulative']);
+    eq(1, $v['day_count'], 'first prescription of the day');
+    eq(0, (int) $v['refills'], 'new prescription = refill 0');
 });
 test('the same checkout token never creates a second visit', function () {
     $doctor = user('doctor');
@@ -408,16 +481,31 @@ test('checkout rejects invalid data with friendly messages', function () {
     Auth::actingAs($doctor);
     $bad = VisitService::checkout(payload([
         'patient'   => ['name' => '', 'gender' => ''],
-        'vitals'    => ['bp_systolic' => '80', 'bp_diastolic' => '120', 'spo2' => '150'],
+        'vitals'    => ['bp_systolic' => '80', 'bp_diastolic' => 'abc'],
         'diagnoses' => [['id' => null, 'name' => 'Made up']],
         'medicines' => [line('Panadol'), line('Panadol'), line('Ventolin Inhaler', ['qty_manual' => 1, 'quantity' => '0'])],
         'follow_up_date' => date('Y-m-d', strtotime('-1 day')),
     ]), $doctor);
     eq(false, $bad['ok']);
     $text = implode(' | ', $bad['errors']);
-    foreach (['Patient name is required', 'Gender is required', 'SpO₂', 'diastolic', 'must be selected from the list', 'Medicine already added', 'Invalid quantity', 'Follow-up date'] as $needle) {
+    foreach (['Patient name is required', 'Gender is required', 'BP diastolic must be a number', 'must be selected from the list', 'Medicine already added', 'Invalid quantity', 'Follow-up date'] as $needle) {
         ok(str_contains($text, $needle), "missing error: $needle in [$text]");
     }
+});
+test('unusual vitals are saved and returned as warnings, never blocked', function () {
+    $doctor = user('doctor');
+    Auth::actingAs($doctor);
+    $r = VisitService::checkout(payload(['vitals' => ['pulse' => '300', 'temperature' => '37', 'spo2' => '150', 'bp_systolic' => '80', 'bp_diastolic' => '120'],
+        'allergies' => 'Penicillin', 'findings' => 'Chest clear', 'refills' => '2']), $doctor);
+    ok($r['ok'], 'saved: ' . implode(' ', $r['errors'] ?? []));
+    eq(4, count($r['warnings']), 'pulse, temperature, SpO2 and BP order');
+    $v = VisitService::load($r['visit_id']);
+    eq(300, (int) $v['pulse']);
+    eq('37.0', $v['temperature']);
+    eq('Penicillin', $v['allergies']);
+    eq(0, (int) $v['refills'], 'refill cannot be set by hand');
+    ok($v['day_count'] >= 2, 'day prescription count grows');
+    eq('Penicillin', DB::value('SELECT allergies FROM patients WHERE id = ?', [$v['patient_id']]), 'allergies copied to the patient');
 });
 test('inactive medicines are excluded from new prescriptions', function () {
     $doctor = user('doctor');
@@ -446,6 +534,50 @@ test('master price/source changes never alter saved prescriptions', function () 
     $after = DB::one("SELECT unit_price, source_name, medicine_name FROM visit_medicines WHERE visit_id = ? AND medicine_name = 'Panadol'", [$visitId]);
     eq($before, $after);
     DB::update('medicines', ['price' => 3, 'source_id' => master('medicine_sources', 'Local Pharmacy'), 'name' => 'Panadol'], 'name = ?', ['Panadol Extra']);
+});
+test('noskha wording in English and Urdu', function () use (&$visitId) {
+    Directions::flush();
+    $m = DB::one("SELECT * FROM visit_medicines WHERE visit_id = ? AND medicine_name = 'Panadol'", [$visitId]);
+    eq('1 tablet, three times a day (TDS), for 5 days', Directions::english($m));
+    eq('1 گولی، دن میں تین بار، کھانے کے بعد، 5 دن تک', Directions::urdu($m));
+    eq('Tablet Panadol (Paracetamol) 500mg', Directions::line1($m));
+    $c = DB::one("SELECT * FROM visit_medicines WHERE visit_id = ? AND medicine_name = 'Calpol Syrup'", [$visitId]);
+    ok(str_contains(Directions::urdu($c), 'چھوٹا چمچ'), 'teaspoon in Urdu');
+});
+test('previous visit refill brings everything back, the old visit unchanged', function () use (&$visitId) {
+    $data = VisitService::refillData($visitId);
+    eq(2, count($data['complaints']));
+    eq(1, count($data['diagnoses']));
+    eq(4, count($data['medicines']));
+    eq('Rest well.', $data['overall_instructions']);
+    ok(count(VisitService::history((int) DB::value('SELECT patient_id FROM visits WHERE id = ?', [$visitId]))) >= 1, 'history lists visits');
+});
+test('refill counts repeats automatically: original 0, repeat 1, repeat of repeat 2', function () use (&$visitId) {
+    $doctor = user('doctor');
+    Auth::actingAs($doctor);
+    $r1 = VisitService::checkout(payload(['repeated_from_visit_id' => $visitId, 'medicines' => [line('Panadol')]]), $doctor);
+    eq(1, (int) DB::value('SELECT refills FROM visits WHERE id = ?', [$r1['visit_id']]));
+    $r2 = VisitService::checkout(payload(['repeated_from_visit_id' => $r1['visit_id'], 'medicines' => [line('Panadol')]]), $doctor);
+    eq(2, (int) DB::value('SELECT refills FROM visits WHERE id = ?', [$r2['visit_id']]));
+});
+test('migration v4 repairs saved prescriptions whose main Rx was empty', function () use (&$visitId) {
+    DB::run('UPDATE visit_medicines SET is_main_rx = 0, billable = 1 WHERE visit_id = ?', [$visitId]);
+    DB::run('UPDATE visits SET grand_total = 99999 WHERE id = ?', [$visitId]);
+    \App\Core\Settings::set(['schema_version' => '3']);
+    Migrator::runIfNeeded();
+    \App\Core\Settings::flush();
+    ok((int) DB::value('SELECT COUNT(*) FROM visit_medicines WHERE visit_id = ? AND is_main_rx = 1', [$visitId]) > 0, 'main Rx restored');
+    eq('2300.00', DB::value('SELECT grand_total FROM visits WHERE id = ?', [$visitId]), 'bill recalculated');
+    eq(Migrator::LATEST, Migrator::current());
+    ok((bool) DB::value("SELECT 1 FROM activity_logs WHERE action = 'Prescription regrouped' AND record_id = ?", [(string) $visitId]), 'repair logged');
+});
+test('trending lists the doctor\'s most used items first', function () {
+    $t = ClinicalItems::trending((int) user('doctor')['id']);
+    $top = array_slice(array_column($t['complaints'], 'name'), 0, 2);
+    ok(in_array('Fever', $top, true), 'most used complaint first (ties by name)');
+    ok($t['complaints'][0]['count'] >= $t['complaints'][1]['count'], 'sorted by count');
+    ok($t['complaints'][0]['count'] >= 1, 'has a count');
+    ok(count($t['diagnoses']) <= 20 && count($t['diagnoses']) >= 10, 'topped up from the master list');
 });
 test('repeat uses current prices, skips inactive medicines, keeps original', function () use (&$visitId) {
     DB::update('medicines', ['price' => 5], 'name = ?', ['Panadol']);
@@ -515,6 +647,95 @@ test('visit numbers are unique under repeated generation', function () {
 });
 
 // ============================================================================
+section('Integration: date-wise delete and subscription licence');
+test('delete by table and date range: preview matches, other data stays', function () {
+    $today = today();
+    $before = (int) DB::value('SELECT COUNT(*) FROM visits');
+    DB::run("UPDATE visits SET visit_date = '2020-01-15 10:00:00' WHERE id = (SELECT id FROM (SELECT MIN(id) AS id FROM visits) x)");
+    $preview = DataPurger::preview(['visits', 'activity_logs'], '2020-01-01', '2020-01-31');
+    eq(1, $preview['visits']);
+    $done = DataPurger::purge(['visits'], '2020-01-01', '2020-01-31');
+    eq(1, $done['visits']);
+    eq($before - 1, (int) DB::value('SELECT COUNT(*) FROM visits'));
+    eq(0, (int) DB::value('SELECT COUNT(*) FROM visit_medicines vm LEFT JOIN visits v ON v.id = vm.visit_id WHERE v.id IS NULL'), 'no orphan medicines');
+    $logs = DataPurger::preview(['activity_logs'], $today, $today)['activity_logs'];
+    ok($logs > 0, 'today has log entries');
+    eq($logs, DataPurger::purge(['activity_logs'], $today, $today)['activity_logs']);
+});
+test('subscription keys: signed, bound to phone, expiry and clock checks', function () {
+    $kp = sodium_crypto_sign_keypair();
+    $sk = base64_encode(sodium_crypto_sign_secretkey($kp));
+    License::usePublicKey(base64_encode(sodium_crypto_sign_publickey($kp)));
+    \App\Core\Settings::set(['license_key' => '', 'license_phone' => '', 'license_last_seen' => '', 'license_trial_start' => '']);
+    License::flush();
+    eq('trial', License::status()['state'], 'new install starts a trial');
+    ok(License::allowsLogin(), 'trial allows login');
+    \App\Core\Settings::set(['license_trial_start' => date('Y-m-d', strtotime('-30 days'))]);
+    License::flush();
+    eq('expired', License::status()['state'], 'trial over');
+    ok(!License::allowsLogin(), 'expired trial blocks login');
+
+    $key = License::issue($sk, '0300-1234567', date('Y-m-d', strtotime('-10 days')), date('Y-m-d', strtotime('+365 days')));
+    ok(str_starts_with($key, 'MCP1-'), 'key prefix');
+    eq('03001234567', License::read($key)['phone'], 'leading zero kept');
+    eq(null, License::read(substr($key, 0, -3) . 'ABC'), 'tampered key rejected');
+    eq(false, License::activate('03009999999', $key)['ok'], 'other phone rejected');
+    ok(License::activate('03001234567', $key)['ok'], 'activated');
+    eq('active', License::status()['state']);
+
+    $soon = License::issue($sk, '03001234567', date('Y-m-d', strtotime('-300 days')), date('Y-m-d', strtotime('+5 days')));
+    ok(License::activate('03001234567', $soon)['ok'], 'renewal key accepted');
+    eq('expiring', License::status()['state'], 'warns before expiry');
+    eq(6, License::status()['days_left']);
+
+    $old = License::issue($sk, '03001234567', '2025-01-01', '2025-12-31');
+    eq(false, License::activate('03001234567', $old)['ok'], 'already expired key refused');
+    \App\Core\Settings::set(['license_key' => $old]);
+    License::flush();
+    eq('expired', License::status()['state']);
+
+    \App\Core\Settings::set(['license_key' => $key, 'license_last_seen' => date('Y-m-d', strtotime('+10 days'))]);
+    License::flush();
+    eq('clock', License::status()['state'], 'clock moved back is detected');
+    ok(!License::allowsLogin(), 'clock tampering blocks login');
+
+    $acts = License::activationLog();
+    eq(2, count($acts), 'every successful activation is logged (the refused expired key is not)');
+    $byKey = array_column($acts, 'status', 'license_key');
+    ok(str_starts_with($byKey[$key], 'In use'), 'the key in settings is marked in use');
+    eq('Replaced', $byKey[$soon], 'the other key is marked replaced');
+
+    // Vendor generator with its own key file + issued log with status.
+    $file = sys_get_temp_dir() . '/mc_test_vendor.key';
+    file_put_contents($file, $sk);
+    License::useVendorKeyFile($file);
+    ok(License::canIssue(), 'vendor key matches public key');
+    Auth::actingAs(user('superadmin'));
+    $g = License::generate(['phone' => '0321-5550000', 'clinic_name' => 'Test Clinic', 'from' => today(), 'to' => date('Y-m-d', strtotime('+30 days')), 'amount' => '5000', 'payment_ref' => 'TID1']);
+    ok($g['ok'], 'generated: ' . $g['message']);
+    eq('03215550000', License::read($g['key'])['phone']);
+    eq(false, License::generate(['phone' => '123', 'from' => today(), 'to' => today()])['ok'], 'bad phone rejected');
+    $log = License::issuedLog();
+    eq('Test Clinic', $log[0]['clinic_name']);
+    eq('Active', $log[0]['status']);
+    eq('Scheduled', License::periodStatus(date('Y-m-d', strtotime('+3 days')), date('Y-m-d', strtotime('+90 days'))));
+    License::useVendorKeyFile(sys_get_temp_dir() . '/no-such.key');
+    ok(!License::canIssue(), 'clinic installs (no private key) cannot issue');
+    License::useVendorKeyFile(null);
+    @unlink($file);
+
+    License::usePublicKey(null);
+    \App\Core\Settings::set(['license_key' => $key, 'license_last_seen' => today()]);
+    License::flush();
+    eq('invalid', License::status()['state'], 'key signed by another vendor key is invalid');
+    \App\Core\Settings::set(['license_key' => '', 'license_phone' => '', 'license_trial_start' => '']);
+    License::flush();
+});
+
+// ============================================================================
+require __DIR__ . '/v2.php';
+
+// ============================================================================
 section('Integration: backup, restore and reset');
 test('backup → change → restore returns the earlier data', function () {
     Auth::actingAs(user('superadmin'));
@@ -544,10 +765,11 @@ test('restore refuses files that are not MediCare backups', function () {
 test('clinical reset clears patient data and restarts numbering', function () {
     $sa = user('superadmin');
     Auth::actingAs($sa);
+    $users = (int) DB::value('SELECT COUNT(*) FROM users');
     $backup = Installer::reset('clinical', $sa);
     eq(0, (int) DB::value('SELECT COUNT(*) FROM patients'));
     eq(0, (int) DB::value('SELECT COUNT(*) FROM visits'));
-    eq(5, (int) DB::value('SELECT COUNT(*) FROM users'), 'users kept');
+    eq($users, (int) DB::value('SELECT COUNT(*) FROM users'), 'users kept');
     eq(28, (int) DB::value('SELECT COUNT(*) FROM medicines'), 'masters kept');
     [$data] = PatientService::validate(['name' => 'First Again', 'gender' => 'Male']);
     Auth::actingAs(user('doctor'));
@@ -559,7 +781,7 @@ test('factory reset keeps only the super admin with the same login', function ()
     Auth::actingAs($sa);
     $backup = Installer::reset('factory', $sa);
     eq(1, (int) DB::value('SELECT COUNT(*) FROM users'));
-    eq('admin123', DB::value("SELECT password FROM users WHERE username = 'superadmin'"));
+    ok(Password::verify('admin123', (string) DB::value("SELECT password FROM users WHERE username = 'superadmin'")), 'same super-admin password');
     eq(0, (int) DB::value('SELECT COUNT(*) FROM patients'));
     eq(28, (int) DB::value('SELECT COUNT(*) FROM medicines'), 'masters reloaded');
     @unlink(Backup::dir() . '/' . $backup);
