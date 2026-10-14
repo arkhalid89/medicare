@@ -23,6 +23,9 @@ internal static class Program
     private static extern bool SetProcessDPIAware();
 #endif
 
+    /// <summary>Animations follow the This PC setting and are always off over Remote Desktop.</summary>
+    public static void ApplyMotion() => Motion.Enabled = Session.Config.Animations && !SystemInformation.TerminalServerSession;
+
     [STAThread]
     private static void Main()
     {
@@ -47,6 +50,7 @@ internal static class Program
 
         Session.Config = ClientConfig.Load();
         Theme.Init(Session.Config.Compact);
+        ApplyMotion();
         Log.Info($"Client {Version} starting on {Environment.OSVersion}");
         Run();
     }

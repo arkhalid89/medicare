@@ -33,15 +33,22 @@ Every component defines default, hover, focus, active/pressed, disabled, loading
 | Text input | default, with prefix/suffix, numeric (right-aligned mono), search | 2 px accent border on focus + 4 px halo; error: danger border + message below; never placeholder-only labels |
 | Scan field | POS, goods-in | Always refocused after any action; 48 px; accepts 1D, GS1 2D, typed text; shows parse result chip for 1.5 s |
 | Select / lookup | single, typeahead lookup (medicine, customer, supplier) | Lookup opens a list under the field; Enter picks; shows stock and price for medicines |
-| Data grid | list, editable (cart, invoice lines), ledger (running balance) | Header surface-alt, 11 px uppercase; numbers right-aligned mono; selected row `--c-select` + 3 px accent left edge; zebra none; sticky header; virtual mode above 500 rows |
+| Data grid | list, editable (cart, invoice lines), ledger (running balance) | Header surface-alt, 11 px uppercase; numbers right-aligned mono; selected row `--c-select`; very faint zebra (`#FAFCFC`); hover tints the row; a line just added flashes teal for 0.7 s; empty state shows an icon and one sentence; sticky header; virtual mode above 500 rows |
 | Chip / status | FEFO, 2D SCAN, NN DAYS (warn), EXPIRED (danger), QUARANTINE, DRAFT, POSTED, REVERSED, PENDING | Always text plus colour |
-| KPI card | value, delta, sparkline, "estimated" flag | Only on the dashboard |
+| KPI card | value, sub line, icon chip, tone stripe | Only on the dashboard. Figures count up when they change; cards that open a screen lift and show an arrow on hover |
 | Keycap strip | POS only | 10 keys; the primary key (F4) uses accent fill; labels configurable |
-| Toast | success, warning, error | Bottom-right, 4 s, never for errors that need action (use inline or dialog) |
+| Toast | success, warning, info | Top-right under the header, 4.5 s (approvals 8 s), pauses on hover, click acts (e.g. opens Approvals). Never takes focus; never for errors that need action (use inline or dialog) |
 | Banner | info, warning, danger | Full-width under header: host down, maintenance, restored data |
 | Dialog | standard, approval (SCR-07), confirm-irreversible (typed phrase) | Focus trapped; first field focused |
 | Empty state | per list | One sentence on what appears here plus the action to create the first item |
 | Chart (own GDI+ control) | bar, line, donut (<= 5 parts), sparkline | Faint grid, area fill under lines, labelled endpoint, text alternative table |
+
+### Motion and icons
+- Icons are line drawings painted by `Ui/Icons.cs` on a 24-unit grid (no image files): every menu item, screen header, KPI card, message bar and empty state has one.
+- `Ui/Motion.cs` runs short tweens on one UI timer: hover fades (140–160 ms), the sliding menu selection (260 ms), figure count-ups (320–700 ms), chart reveals (800–900 ms), toasts, the sale-complete tick. Nothing waits for an animation; input is never blocked.
+- Animations can be turned off per PC (This PC → Animations) and are always off over Remote Desktop; every animation then jumps to its end state.
+- A 3 px progress line under the header shows while a request to the host takes longer than 250 ms.
+- After a sale the empty cart shows a sale-complete card (tick, invoice number, net, and the change to give in large type). It is not focusable, so the next scan goes straight to the scan box.
 
 ## 4. Accessibility rules (WCAG 2.1 AA, adapted to desktop)
 - Contrast as in tokens.css (all >= 4.5:1 text, >= 3:1 UI boundaries).

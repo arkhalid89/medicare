@@ -33,6 +33,14 @@ public static class Theme
     public static readonly Color Nav = Hex("#10262B");
     public static readonly Color NavInk = Hex("#C9D6D8");
     public static readonly Color NavActive = Hex("#1D3A40");
+    public static readonly Color NavHover = Hex("#18323A");
+    public static readonly Color NavGlow = Hex("#4FB8C0");
+    public static readonly Color AccentSoft = Hex("#CFE8E9");
+    public static readonly Color AccentDeep = Hex("#07474C");
+    public static readonly Color Gold = Hex("#E8A33D");
+
+    /// <summary>Chart series colours, in order.</summary>
+    public static readonly Color[] Palette = { Accent, Gold, NavGlow, Hex("#6D5BD0"), Ok, Hex("#C2410C"), InkMuted };
 
     public static bool Compact { get; set; }
 
@@ -93,6 +101,28 @@ public static class Theme
     public static int FKeyHeight => S(46);
 
     public static Color Hex(string hex) => ColorTranslator.FromHtml(hex);
+
+    /// <summary>Mix two colours; t = 0 gives a, t = 1 gives b.</summary>
+    public static Color Blend(Color a, Color b, float t)
+    {
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        int Mix(int x, int y) => (int)Math.Round(x + (y - x) * t);
+        return Color.FromArgb(Mix(a.A, b.A), Mix(a.R, b.R), Mix(a.G, b.G), Mix(a.B, b.B));
+    }
+
+    public static Color Alpha(Color c, int alpha) => Color.FromArgb(Math.Max(0, Math.Min(255, alpha)), c.R, c.G, c.B);
+
+    /// <summary>Soft drop shadow under a rounded rectangle (a few translucent layers, no blur needed).</summary>
+    public static void Shadow(Graphics g, Rectangle r, int radius, float strength = 1f)
+    {
+        for (int i = 3; i >= 1; i--)
+        {
+            var layer = new Rectangle(r.X - i + 1, r.Y + i, r.Width + (i - 1) * 2, r.Height + i - 1);
+            using var path = Rounded(layer, radius + i);
+            using var b = new SolidBrush(Color.FromArgb((int)(10 * strength * (4 - i)), 16, 38, 43));
+            g.FillPath(b, path);
+        }
+    }
 
     public static Color Fore(Tone t) => t switch
     {

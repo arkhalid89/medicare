@@ -8,8 +8,17 @@ public enum ButtonKind { Secondary, Primary, Accent, Danger, Ghost }
 /// <summary>Flat button drawn from tokens. Optional keycap hint ("F4") on the right.</summary>
 public class UiButton : Button
 {
-    private bool _hover, _down;
+    private bool _down;
+    private float _hoverT;
     private ButtonKind _kind;
+    private string _icon = "";
+
+    /// <summary>Optional line icon drawn before the text (see <see cref="Icons"/>).</summary>
+    public string Icon
+    {
+        get => _icon;
+        set { _icon = value ?? ""; if (Width < Measure()) Width = Measure(); Invalidate(); }
+    }
 
     [DefaultValue(ButtonKind.Secondary)]
     public ButtonKind Kind { get => _kind; set { _kind = value; Invalidate(); } }
@@ -48,6 +57,7 @@ public class UiButton : Button
     public int Measure()
     {
         var w = TextRenderer.MeasureText(Text, Font).Width + Theme.S(28);
+        if (_icon.Length > 0) w += Theme.S(24);
         if (Hint.Length > 0) w += TextRenderer.MeasureText(Hint, Theme.Keycap).Width + Theme.S(14);
         return Math.Max(w, Theme.S(84));
     }
@@ -60,8 +70,14 @@ public class UiButton : Button
         return this;
     }
 
-    protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
-    protected override void OnMouseLeave(EventArgs e) { _hover = false; _down = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnMouseEnter(EventArgs e) { FadeHover(1f); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { _down = false; FadeHover(0f); base.OnMouseLeave(e); }
+
+    private void FadeHover(float to)
+    {
+        var from = _hoverT;
+        Motion.Run(this, "hover", 140, t => { _hoverT = Motion.Lerp(from, to, t); Invalidate(); });
+    }
     protected override void OnMouseDown(MouseEventArgs e) { _down = true; Invalidate(); base.OnMouseDown(e); }
     protected override void OnMouseUp(MouseEventArgs e) { _down = false; Invalidate(); base.OnMouseUp(e); }
     protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
@@ -74,15 +90,18 @@ public class UiButton : Button
         Theme.Smooth(g);
         var behind = Theme.EffectiveBack(Parent);
         g.Clear(behind);
-        Color back, fore, border;
+        Color back, hoverBack, fore, border;
         switch (Kind)
         {
-            case ButtonKind.Primary: back = _hover ? Theme.PrimaryHover : Theme.Primary; fore = Color.White; border = back; break;
-            case ButtonKind.Accent: back = _hover ? Theme.AccentHover : Theme.Accent; fore = Color.White; border = back; break;
-            case ButtonKind.Danger: back = _hover ? Theme.Hex("#9A1D14") : Theme.Danger; fore = Color.White; border = back; break;
-            case ButtonKind.Ghost: back = _hover ? Theme.SurfaceAlt : behind; fore = Theme.Accent; border = back; break;
-            default: back = _hover ? Theme.SurfaceAlt : Theme.Surface; fore = Theme.Ink; border = Theme.LineStrong; break;
+            case ButtonKind.Primary: back = Theme.Primary; hoverBack = Theme.PrimaryHover; fore = Color.White; border = back; break;
+            case ButtonKind.Accent: back = Theme.Accent; hoverBack = Theme.AccentHover; fore = Color.White; border = back; break;
+            case ButtonKind.Danger: back = Theme.Danger; hoverBack = Theme.Hex("#9A1D14"); fore = Color.White; border = back; break;
+            case ButtonKind.Ghost: back = behind; hoverBack = Theme.Select; fore = Theme.Accent; border = back; break;
+            default: back = Theme.Surface; hoverBack = Theme.Select; fore = Theme.Ink; border = Theme.LineStrong; break;
         }
+        back = Theme.Blend(back, hoverBack, _hoverT);
+        border = Kind == ButtonKind.Secondary ? Theme.Blend(border, Theme.Accent, _hoverT) : back;
+        if (_down) back = Theme.Blend(back, Color.Black, 0.12f);
         if (!Enabled) { back = Theme.SurfaceAlt; fore = Theme.LineStrong; border = Theme.Line; }
         var r = new Rectangle(0, 0, Width - 1, Height - 1);
         if (_down) r.Inflate(-1, -1);
@@ -106,6 +125,16 @@ public class UiButton : Button
                 g.FillPath(b, path);
             TextRenderer.DrawText(g, Hint, Theme.Keycap, kr, fore, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             textRect.Width = kr.Left - textRect.Left - Theme.S(4);
+        }
+        if (_icon.Length > 0)
+        {
+            var iconSize = Theme.S(16);
+            var textW = Math.Min(TextRenderer.MeasureText(Text, Font).Width, textRect.Width - iconSize - Theme.S(6));
+            var x = textRect.Left + Math.Max(0, (textRect.Width - iconSize - Theme.S(6) - textW) / 2);
+            Icons.Draw(g, _icon, new RectangleF(x, (Height - iconSize) / 2f, iconSize, iconSize), fore, 2.2f);
+            textRect = new Rectangle(x + iconSize + Theme.S(6), 0, textRect.Right - x - iconSize - Theme.S(6), Height);
+            TextRenderer.DrawText(g, Text, Font, textRect, fore, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            return;
         }
         TextRenderer.DrawText(g, Text, Font, textRect, fore, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
     }
@@ -154,6 +183,16 @@ public sealed class KeycapBar : Control
     private List<FKey> _keys = new List<FKey>();
     private readonly List<(Rectangle rect, FKey key)> _hits = new List<(Rectangle, FKey)>();
     private int _hover = -1;
+    private Keys _flashKey;
+    private float _flashT;
+
+    /// <summary>Briefly lights the keycap for a key that was just pressed on the keyboard.</summary>
+    public void Flash(Keys key)
+    {
+        if (!_keys.Any(k => k.Key == key)) return;
+        _flashKey = key;
+        Motion.Run(this, "flash", 420, t => { _flashT = 1f - t; Invalidate(); }, () => _flashKey = Keys.None);
+    }
 
     public KeycapBar()
     {
@@ -190,9 +229,11 @@ public sealed class KeycapBar : Control
             var y = (Height - capH) / 2;
             var cap = new Rectangle(x, y, capW, capH);
             var whole = new Rectangle(x - Theme.S(4), Theme.S(4), total, Height - Theme.S(8));
-            if (_hover == i && enabled)
+            var flash = k.Key == _flashKey ? _flashT : 0f;
+            if ((_hover == i && enabled) || flash > 0)
                 using (var path = Theme.Rounded(whole, Theme.S(6)))
-                using (var b = new SolidBrush(Theme.Select)) g.FillPath(b, path);
+                using (var b = new SolidBrush(Theme.Blend(_hover == i ? Theme.Select : Theme.Surface, Theme.AccentSoft, flash))) g.FillPath(b, path);
+            if (flash > 0.5f) cap.Offset(0, 1);
             var capBack = k.Primary && enabled ? Theme.Primary : Theme.SurfaceAlt;
             var capFore = k.Primary && enabled ? Color.White : enabled ? Theme.Ink : Theme.LineStrong;
             using (var path = Theme.Rounded(cap, Theme.S(4)))
@@ -242,52 +283,147 @@ public class Card : Panel
         Margin = new Padding(Theme.S(6));
     }
 
+    // cards whose content runs to the edge (grids) get small corners so the content does not poke out
+    private int Radius => Padding.Left >= Theme.S(8) ? Theme.S(10) : Theme.S(3);
+
+    protected override void OnPaintBackground(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        Theme.Smooth(g);
+        g.Clear(Theme.EffectiveBack(Parent));
+        var r = new Rectangle(0, 0, Width - 1, Height - 1);
+        using var path = Theme.Rounded(r, Radius);
+        using (var b = new SolidBrush(BackColor)) g.FillPath(b, path);
+        using (var p = new Pen(Theme.Line)) g.DrawPath(p, path);
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
-        base.OnPaint(e);
-        using (var p = new Pen(Theme.Line)) e.Graphics.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
-        if (Heading.Length > 0)
-            TextRenderer.DrawText(e.Graphics, Heading.ToUpperInvariant(), Theme.Xs, new Rectangle(Theme.S(14), Theme.S(10), Width - Theme.S(28), Theme.S(20)), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+        if (Heading.Length == 0) return;
+        var g = e.Graphics;
+        using (var b = new SolidBrush(Theme.Accent))
+        using (var path = Theme.Rounded(new Rectangle(Theme.S(14), Theme.S(14), Theme.S(4), Theme.S(12)), Theme.S(2)))
+            g.FillPath(b, path);
+        TextRenderer.DrawText(g, Heading.ToUpperInvariant(), Theme.Xs, new Rectangle(Theme.S(24), Theme.S(10), Width - Theme.S(38), Theme.S(20)), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
     }
 }
 
-/// <summary>Dashboard figure: label, big value, sub line, tone stripe.</summary>
+/// <summary>
+/// Dashboard figure: icon, label, big value (counts up when it changes), sub line and tone.
+/// Lifts and shows an arrow on hover when it opens a detail screen.
+/// </summary>
 public sealed class KpiTile : Control
 {
+    private static readonly System.Text.RegularExpressions.Regex Number = new System.Text.RegularExpressions.Regex(@"\d[\d,]*(\.\d+)?");
+    private string _target = "";
+    private float _hoverT, _appear = 1f;
+    private bool _hover;
+
     public string Label { get; set; } = "";
-    public string Value { get; set; } = "";
+    public string Value { get; private set; } = "";
     public string Sub { get; set; } = "";
+    public string Icon { get; set; } = "";
     public Tone Tone { get; set; }
     public event Action? Activated;
 
     public KpiTile()
     {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-        BackColor = Theme.Surface;
-        Size = new Size(Theme.S(220), Theme.S(104));
-        Margin = new Padding(Theme.S(6));
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.SupportsTransparentBackColor, true);
+        BackColor = Color.Transparent;
+        Size = new Size(Theme.S(232), Theme.S(112));
+        Margin = new Padding(Theme.S(4));
     }
 
     public void Set(string value, string sub = "", Tone tone = Tone.None)
     {
-        Value = value; Sub = sub; Tone = tone;
+        var old = _target;
+        _target = value; Sub = sub; Tone = tone;
         Cursor = Activated != null ? Cursors.Hand : Cursors.Default;
+        if (value == old) { Invalidate(); return; }
+
+        var m = Number.Match(value);
+        // count up only for plain figures ("Rs 12,345.00", "42"), never for dates or times
+        if (m.Success && value.Length - m.Length <= 4 && decimal.TryParse(m.Value.Replace(",", ""), NumberStyles.Number, CultureInfo.InvariantCulture, out var to))
+        {
+            var om = Number.Match(old);
+            var from = om.Success && old.Length - om.Length <= 4 && decimal.TryParse(om.Value.Replace(",", ""), NumberStyles.Number, CultureInfo.InvariantCulture, out var f) ? f : 0m;
+            var decimals = m.Groups[1].Success ? m.Groups[1].Value.Length - 1 : 0;
+            var format = (m.Value.Contains(",") || to >= 1000 ? "#,##0" : "0") + (decimals > 0 ? "." + new string('0', decimals) : "");
+            var prefix = value.Substring(0, m.Index);
+            var suffix = value.Substring(m.Index + m.Length);
+            Motion.Run(this, "count", 700, t =>
+            {
+                var v = t >= 1f ? to : from + (to - from) * (decimal)t;
+                Value = prefix + v.ToString(format, CultureInfo.InvariantCulture) + suffix;
+                Invalidate();
+            }, () => { Value = value; Invalidate(); });
+        }
+        else Value = value;
+        if (old.Length == 0) Motion.Run(this, "appear", 420, t => { _appear = t; Invalidate(); });
         Invalidate();
     }
 
     protected override void OnClick(EventArgs e) { Activated?.Invoke(); base.OnClick(e); }
 
+    protected override void OnMouseEnter(EventArgs e) { _hover = true; Fade(1f); base.OnMouseEnter(e); }
+    protected override void OnMouseLeave(EventArgs e) { _hover = false; Fade(0f); base.OnMouseLeave(e); }
+
+    private void Fade(float to)
+    {
+        if (Activated == null) return;
+        var from = _hoverT;
+        Motion.Run(this, "hover", 160, t => { _hoverT = Motion.Lerp(from, to, t); Invalidate(); });
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         var g = e.Graphics;
-        g.Clear(Theme.Surface);
-        using (var p = new Pen(Theme.Line)) g.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
+        Theme.Smooth(g);
+        g.Clear(Theme.EffectiveBack(Parent));
+        var lift = (int)Math.Round(_hoverT * Theme.S(3));
+        var body = new Rectangle(Theme.S(2), Theme.S(3) - lift, Width - Theme.S(5), Height - Theme.S(8));
+        var radius = Theme.S(10);
+        Theme.Shadow(g, body, radius, 0.8f + _hoverT * 1.4f);
+        using (var path = Theme.Rounded(body, radius))
+        {
+            using (var b = new SolidBrush(Theme.Surface)) g.FillPath(b, path);
+            using (var p = new Pen(Theme.Blend(Theme.Line, Theme.Accent, _hoverT * 0.8f))) g.DrawPath(p, path);
+        }
+        // tone stripe along the top edge
         if (Tone != Tone.None)
-            using (var b = new SolidBrush(Theme.Fore(Tone))) g.FillRectangle(b, 0, 0, Theme.S(4), Height);
+        {
+            var clip = g.Clip;
+            using (var path = Theme.Rounded(body, radius)) g.SetClip(path);
+            using (var b = new SolidBrush(Theme.Fore(Tone))) g.FillRectangle(b, body.Left, body.Top, body.Width, Theme.S(3));
+            g.Clip = clip;
+        }
+
         var pad = Theme.S(16);
-        TextRenderer.DrawText(g, Label.ToUpperInvariant(), Theme.Xs, new Rectangle(pad, Theme.S(12), Width - pad * 2, Theme.S(18)), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(g, Value, Theme.Kpi, new Rectangle(pad, Theme.S(32), Width - pad * 2, Theme.S(36)), Tone == Tone.Danger ? Theme.Danger : Theme.Ink, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(g, Sub, Theme.Small, new Rectangle(pad, Theme.S(72), Width - pad * 2, Theme.S(22)), Tone == Tone.None ? Theme.InkMuted : Theme.Fore(Tone), TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        var chip = Theme.S(34);
+        var iconRect = new Rectangle(body.Right - pad - chip + Theme.S(4), body.Top + Theme.S(14), chip, chip);
+        if (Icon.Length > 0)
+        {
+            var tone = Tone == Tone.None ? Tone.Accent : Tone;
+            using (var b = new SolidBrush(Theme.Back(tone)))
+            using (var path = Theme.Rounded(iconRect, Theme.S(9)))
+                g.FillPath(b, path);
+            var inset = Theme.S(8);
+            Icons.Draw(g, Icon, new RectangleF(iconRect.X + inset, iconRect.Y + inset, chip - inset * 2, chip - inset * 2), Theme.Fore(tone), 2.2f);
+        }
+        var textW = body.Width - pad * 2 - (Icon.Length > 0 ? chip : 0);
+        TextRenderer.DrawText(g, Label.ToUpperInvariant(), Theme.Xs, new Rectangle(body.Left + pad, body.Top + Theme.S(14), textW, Theme.S(18)), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        var rise = (int)((1f - _appear) * Theme.S(10));
+        var valueColor = Theme.Blend(Theme.Surface, Tone == Tone.Danger ? Theme.Danger : Theme.Ink, _appear);
+        TextRenderer.DrawText(g, Value, Theme.Kpi, new Rectangle(body.Left + pad - Theme.S(2), body.Top + Theme.S(34) + rise, body.Width - pad * 2, Theme.S(36)), valueColor, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        var subColor = Tone == Tone.None || Tone == Tone.Ok ? Theme.InkMuted : Theme.Fore(Tone);
+        var subRect = new Rectangle(body.Left + pad, body.Top + Theme.S(74), body.Width - pad * 2 - (Activated != null ? Theme.S(20) : 0), Theme.S(22));
+        TextRenderer.DrawText(g, Sub, Theme.Small, subRect, Theme.Blend(Theme.Surface, subColor, _appear), TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        if (Activated != null && (_hoverT > 0.01f || _hover))
+        {
+            var a = Theme.S(16);
+            var shift = (int)((1f - _hoverT) * Theme.S(6));
+            Icons.Draw(g, "arrow", new RectangleF(body.Right - pad - a + Theme.S(4) - shift, subRect.Top + (subRect.Height - a) / 2f, a, a), Theme.Blend(Theme.Surface, Theme.Accent, _hoverT), 2.4f);
+        }
     }
 }
 
@@ -315,71 +451,6 @@ public sealed class Badge : Label
     }
 
     public Tone Tone => _tone;
-}
-
-/// <summary>Simple bar chart (GDI+). Values are drawn with their labels; no third-party charting.</summary>
-public sealed class BarChart : Control
-{
-    private List<KeyValuePair<string, decimal>> _data = new List<KeyValuePair<string, decimal>>();
-    public bool Horizontal { get; set; }
-    public Func<decimal, string> Format { get; set; } = v => Money.Format(v);
-
-    public BarChart()
-    {
-        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
-        BackColor = Theme.Surface;
-    }
-
-    public void SetData(IEnumerable<KeyValuePair<string, decimal>> data)
-    {
-        _data = data.ToList();
-        Invalidate();
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        Theme.Smooth(g);
-        g.Clear(BackColor);
-        if (_data.Count == 0)
-        {
-            TextRenderer.DrawText(g, "No data yet", Theme.Small, ClientRectangle, Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            return;
-        }
-        var max = Math.Max(_data.Max(d => d.Value), 1m);
-        using var bar = new SolidBrush(Theme.Accent);
-        if (Horizontal)
-        {
-            var labelW = Theme.S(90);
-            var valueW = Theme.S(110);
-            var rowH = Math.Max(Theme.S(18), Math.Min(Theme.S(30), Height / _data.Count));
-            for (int i = 0; i < _data.Count; i++)
-            {
-                var y = i * rowH;
-                var avail = Width - labelW - valueW - Theme.S(8);
-                var w = (int)(avail * (float)(_data[i].Value / max));
-                TextRenderer.DrawText(g, _data[i].Key, Theme.Small, new Rectangle(0, y, labelW, rowH), Theme.Ink, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
-                g.FillRectangle(bar, labelW, y + rowH / 4, Math.Max(w, 1), rowH / 2);
-                TextRenderer.DrawText(g, Format(_data[i].Value), Theme.NumSmall, new Rectangle(labelW + w + Theme.S(6), y, valueW, rowH), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
-            }
-            return;
-        }
-        var bottom = Height - Theme.S(22);
-        var top = Theme.S(18);
-        var slot = (float)Width / _data.Count;
-        var bw = Math.Max(4f, slot * 0.6f);
-        using var grid = new Pen(Theme.Line);
-        g.DrawLine(grid, 0, bottom, Width, bottom);
-        for (int i = 0; i < _data.Count; i++)
-        {
-            var h = (bottom - top) * (float)(_data[i].Value / max);
-            var x = i * slot + (slot - bw) / 2;
-            g.FillRectangle(bar, x, bottom - h, bw, h);
-            TextRenderer.DrawText(g, _data[i].Key, Theme.Xs, new Rectangle((int)(i * slot), bottom + 2, (int)slot, Theme.S(18)), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter);
-        }
-        var last = _data[_data.Count - 1];
-        TextRenderer.DrawText(g, "Max " + Format(max), Theme.Xs, new Rectangle(0, 0, Width, top), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Right);
-    }
 }
 
 /// <summary>Themed single-line text box.</summary>
@@ -568,15 +639,19 @@ public sealed class UiLabel : Label
     }
 }
 
-/// <summary>Inline message bar (errors, warnings, info) at the top of a dialog or screen.</summary>
+/// <summary>Inline message bar (errors, warnings, info, success) at the top of a dialog or screen. Flashes when shown.</summary>
 public sealed class MessageBar : Label
 {
+    private Tone _tone = Tone.Danger;
+    private float _flash;
+
     public MessageBar()
     {
+        SetStyle(ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw, true);
         AutoSize = false;
         Dock = DockStyle.Top;
         Height = Theme.S(36);
-        Padding = new Padding(Theme.S(12), 0, Theme.S(12), 0);
+        Padding = new Padding(Theme.S(40), 0, Theme.S(12), 0);
         TextAlign = ContentAlignment.MiddleLeft;
         Font = Theme.Ui;
         Visible = false;
@@ -585,6 +660,7 @@ public sealed class MessageBar : Label
     public void Show(string text, Tone tone = Tone.Danger)
     {
         Text = text;
+        _tone = tone;
         BackColor = Theme.Back(tone);
         ForeColor = Theme.Fore(tone);
         using (var g = CreateGraphics())
@@ -595,9 +671,23 @@ public sealed class MessageBar : Label
             Height = Math.Max(Theme.S(36), size.Height + Theme.S(14));
         }
         Visible = true;
+        Motion.Run(this, "flash", 600, t => { _flash = 1f - t; Invalidate(); });
     }
 
     public void Clear() { Visible = false; Text = ""; }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        Theme.Smooth(g);
+        g.Clear(Theme.Blend(BackColor, Theme.Alpha(ForeColor, 255), _flash * 0.22f));
+        using (var b = new SolidBrush(ForeColor)) g.FillRectangle(b, 0, 0, Theme.S(4), Height);
+        var icon = _tone switch { Tone.Ok => "check", Tone.Danger => "alert", Tone.Warn => "alert", _ => "info" };
+        var size = Theme.S(18);
+        Icons.Draw(g, icon, new RectangleF(Theme.S(14), (Height - size) / 2f, size, size), ForeColor, 2.2f);
+        var r = new Rectangle(Padding.Left, 0, Width - Padding.Horizontal, Height);
+        TextRenderer.DrawText(g, Text, Font, r, ForeColor, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
+    }
 }
 
 /// <summary>

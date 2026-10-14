@@ -58,4 +58,4 @@ If the host stops answering while you take payment, the sale is kept on this PC.
 - **Backup and restore:** Ctrl+B back up now; Ctrl+U copy to USB (the copy is verified); Restore needs your password and the word RESTORE, and every PC must log in again afterwards.
 - **Audit log:** filter by date, action or text; Enter shows before/after, reason and approver.
 - **Host and workstations:** host health and certificate fingerprint, connected PCs (block or allow), run the self-check.
-- **This PC** (your name menu): counter number, receipt printer and width, A4 printer, automatic receipt printing, cash drawer, compact layout.
+- **This PC** (your name menu): counter number, receipt printer and width, A4 printer, automatic receipt printing, cash drawer, compact layout, animations (turn off on a very slow PC).

@@ -3,23 +3,24 @@ namespace MediCare.Client.Screens;
 /// <summary>SCR-03 Dashboard: today's money, stock risk, dues, approvals, backup and self-check (filtered by role).</summary>
 public sealed class DashboardScreen : AppScreen
 {
+    private readonly HeroBanner _hero = new HeroBanner();
     private readonly FlowLayoutPanel _tiles = new FlowLayoutPanel();
-    private readonly KpiTile _sales = new KpiTile { Label = "Net sales today" };
-    private readonly KpiTile _invoices = new KpiTile { Label = "Invoices today" };
-    private readonly KpiTile _profit = new KpiTile { Label = "Estimated gross profit" };
-    private readonly KpiTile _cash = new KpiTile { Label = "Cash in / out today" };
-    private readonly KpiTile _mine = new KpiTile { Label = "My sales today" };
-    private readonly KpiTile _near = new KpiTile { Label = "Near expiry" };
-    private readonly KpiTile _expired = new KpiTile { Label = "Expired in stock" };
-    private readonly KpiTile _low = new KpiTile { Label = "Below minimum stock" };
-    private readonly KpiTile _custDues = new KpiTile { Label = "Customers owe" };
-    private readonly KpiTile _suppDues = new KpiTile { Label = "We owe suppliers" };
-    private readonly KpiTile _approvals = new KpiTile { Label = "Approvals waiting" };
-    private readonly KpiTile _backup = new KpiTile { Label = "Last backup" };
-    private readonly KpiTile _check = new KpiTile { Label = "Nightly self-check" };
-    private readonly KpiTile _inventory = new KpiTile { Label = "Stock value (cost)" };
-    private readonly BarChart _daily = new BarChart();
-    private readonly BarChart _split = new BarChart { Horizontal = true };
+    private readonly KpiTile _sales = new KpiTile { Label = "Net sales today", Icon = "trend" };
+    private readonly KpiTile _invoices = new KpiTile { Label = "Invoices today", Icon = "receipt" };
+    private readonly KpiTile _profit = new KpiTile { Label = "Estimated gross profit", Icon = "chart" };
+    private readonly KpiTile _cash = new KpiTile { Label = "Cash in / out today", Icon = "cash" };
+    private readonly KpiTile _mine = new KpiTile { Label = "My sales today", Icon = "user" };
+    private readonly KpiTile _near = new KpiTile { Label = "Near expiry", Icon = "clock" };
+    private readonly KpiTile _expired = new KpiTile { Label = "Expired in stock", Icon = "alert" };
+    private readonly KpiTile _low = new KpiTile { Label = "Below minimum stock", Icon = "down" };
+    private readonly KpiTile _custDues = new KpiTile { Label = "Customers owe", Icon = "users" };
+    private readonly KpiTile _suppDues = new KpiTile { Label = "We owe suppliers", Icon = "truck" };
+    private readonly KpiTile _approvals = new KpiTile { Label = "Approvals waiting", Icon = "shield" };
+    private readonly KpiTile _backup = new KpiTile { Label = "Last backup", Icon = "database" };
+    private readonly KpiTile _check = new KpiTile { Label = "Nightly self-check", Icon = "check" };
+    private readonly KpiTile _inventory = new KpiTile { Label = "Stock value (cost)", Icon = "box" };
+    private readonly TrendChart _daily = new TrendChart();
+    private readonly DonutChart _split = new DonutChart { CenterLabel = "Today" };
     private readonly Grid _top = new Grid();
     private readonly Grid _slow = new Grid();
     private readonly Timer _refresh = new Timer { Interval = 60000 };
@@ -37,10 +38,10 @@ public sealed class DashboardScreen : AppScreen
     {
         AutoScroll = true;
         _tiles.Dock = DockStyle.Top;
-        _tiles.AutoSize = true;
-        _tiles.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        _tiles.AutoSize = false;
         _tiles.BackColor = Color.Transparent;
         _tiles.Padding = new Padding(0);
+        _tiles.SizeChanged += (_, _) => FitTiles();
         _near.Activated += () => OpenBatches("NEAR");
         _expired.Activated += () => OpenBatches("EXPIRED");
         _low.Activated += () => OpenBatches("LOW");
@@ -51,7 +52,13 @@ public sealed class DashboardScreen : AppScreen
         _sales.Activated += () => Shell.Open("invoices");
         _invoices.Activated += () => Shell.Open("invoices");
 
-        var charts = new TableLayoutPanel { Dock = DockStyle.Top, Height = Theme.S(260), ColumnCount = 2, BackColor = Color.Transparent };
+        if (Session.Can(Perm.SalesPos)) _hero.AddAction("New sale", "cart", "F2", () => Shell.Open("pos"));
+        if (Session.Can(Perm.PurchasesView)) _hero.AddAction("Goods-in", "truck", "", () => Shell.Open("purchases"));
+        if (Session.CanAny(Perm.ReportsSales, Perm.ReportsStock, Perm.ReportsFinance, Perm.ReportsAdmin)) _hero.AddAction("Reports", "chart", "", () => Shell.Open("reports"));
+        _hero.Dock = DockStyle.Top;
+        SetGreeting();
+
+        var charts = new TableLayoutPanel { Dock = DockStyle.Top, Height = Theme.S(280), ColumnCount = 2, BackColor = Color.Transparent };
         charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 60));
         charts.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 40));
         var dailyCard = new Card("Net sales, last 14 days") { Dock = DockStyle.Fill };
@@ -81,8 +88,35 @@ public sealed class DashboardScreen : AppScreen
         lists.Tag = "finance";
         charts.Tag = "finance";
 
-        Compose(_tiles, Box.Gap(8), charts, Box.Gap(8), lists);
+        Compose(_hero, Box.Gap(8), _tiles, Box.Gap(8), charts, Box.Gap(8), lists);
         _refresh.Tick += (_, _) => { if (Visible) Fire(Fill); };
+    }
+
+    /// <summary>Tiles stretch so each row is filled edge to edge.</summary>
+    private void FitTiles()
+    {
+        var avail = _tiles.ClientSize.Width;
+        if (avail <= 0) return;
+        var margin = Theme.S(8);
+        var cols = Math.Max(1, avail / (Theme.S(220) + margin));
+        var w = avail / cols - margin;
+        foreach (Control t in _tiles.Controls) if (t.Width != w) t.Width = w;
+        // explicit height: an auto-sized flow panel does not re-measure when its children change width
+        var rows = (_tiles.Controls.Count + cols - 1) / cols;
+        var h = rows * (Theme.S(112) + margin);
+        if (_tiles.Height != h) _tiles.Height = h;
+    }
+
+    private void SetGreeting()
+    {
+        var hour = DateTime.Now.Hour;
+        var part = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+        var name = Session.User.FullName.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+        _hero.Heading = name.Length > 0 ? $"{part}, {name}" : part;
+        var s = Session.Settings;
+        var day = DateTime.TryParseExact(s.BusinessDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d.ToString("dddd d MMMM yyyy", CultureInfo.InvariantCulture) : s.BusinessDate;
+        _hero.Sub = $"{day}  ·  {(s.DayClosed ? "day closed" : "business day open")}  ·  counter {Session.Counter}";
+        _hero.Invalidate();
     }
 
     private void OpenBatches(string view) => Fire(async () =>
@@ -100,6 +134,7 @@ public sealed class DashboardScreen : AppScreen
     private async Task Fill()
     {
         var d = await Session.Api.Get<DashboardDto>("dashboard");
+        SetGreeting();
         var tiles = new List<KpiTile>();
         if (d.ShowFinance)
         {
@@ -125,24 +160,39 @@ public sealed class DashboardScreen : AppScreen
             tiles.Add(_approvals);
         }
         var backupAge = d.LastBackupAt.HasValue ? (DateTime.Now - d.LastBackupAt.Value).TotalHours : 999;
-        _backup.Set(d.LastBackupAt.HasValue ? Dates.DisplayTime(d.LastBackupAt.Value) : "Never",
+        _backup.Set(d.LastBackupAt.HasValue ? Relative(d.LastBackupAt.Value) : "Never",
             (d.LastBackupOk ? "OK" : "FAILED") + " · USB " + (d.LastUsbBackupAt.HasValue ? Dates.Display(d.LastUsbBackupAt.Value) : "never"),
             !d.LastBackupOk || backupAge > 26 ? Tone.Danger : d.LastUsbBackupAt == null || (DateTime.Now - d.LastUsbBackupAt.Value).TotalDays > 7 ? Tone.Warn : Tone.Ok);
         _check.Set(d.SelfCheckAt.HasValue ? (d.SelfCheckOk ? "Passed" : "Problems") : "Not run yet", d.SelfCheckSummary, d.SelfCheckAt == null ? Tone.None : d.SelfCheckOk ? Tone.Ok : Tone.Danger);
         tiles.Add(_backup);
         tiles.Add(_check);
 
-        _tiles.SuspendLayout();
-        _tiles.Controls.Clear();
-        foreach (var t in tiles) _tiles.Controls.Add(t);
-        _tiles.ResumeLayout(true);
+        if (!tiles.SequenceEqual(_tiles.Controls.Cast<Control>().OfType<KpiTile>()))
+        {
+            _tiles.SuspendLayout();
+            _tiles.Controls.Clear();
+            foreach (var t in tiles) _tiles.Controls.Add(t);
+            FitTiles();
+            _tiles.ResumeLayout(true);
+        }
 
         foreach (Control c in Controls) if (c.Tag as string == "finance") c.Visible = d.ShowFinance;
-        _daily.Format = v => v >= 1000 ? (v / 1000m).ToString("0.#", CultureInfo.InvariantCulture) + "k" : v.ToString("0", CultureInfo.InvariantCulture);
         _daily.SetData(d.DailySales);
         _split.SetData(d.PaymentSplit);
         _top.SetRows(d.TopSellers, r => r.Cast<object?>().Select((v, i) => i == 2 && decimal.TryParse(Convert.ToString(v, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out var m) ? m : v).ToArray());
         _slow.SetRows(d.SlowMovers, r => r.Cast<object?>().Select((v, i) => i == 2 && decimal.TryParse(Convert.ToString(v, CultureInfo.InvariantCulture), NumberStyles.Any, CultureInfo.InvariantCulture, out var m) ? m : v).ToArray());
+    }
+
+    public override void OnHostEvent(EventDto e)
+    {
+        if (Visible && (e.Type == EventTypes.ApprovalRequested || e.Type == EventTypes.ApprovalDecided)) Fire(Fill);
+    }
+
+    private static string Relative(DateTime at)
+    {
+        var days = (DateTime.Today - at.Date).TotalDays;
+        var time = at.ToString("HH:mm", CultureInfo.InvariantCulture);
+        return days == 0 ? "Today " + time : days == 1 ? "Yesterday " + time : Dates.Display(at);
     }
 
     protected override void Dispose(bool disposing)

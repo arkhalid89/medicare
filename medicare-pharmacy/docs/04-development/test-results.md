@@ -109,12 +109,15 @@ Defects found and fixed in this pass:
 12. Keycap hints set after measuring truncated button labels ("Post inv…").
 13. Return-slip print failure message pointed to a reprint that does not exist.
 
+## Interface upgrade (Windows 7 build under Mono)
+Same rig as the UI smoke test. Checked with screenshots at 1366×768: login (gradient brand panel), menu icons with the sliding selection and hover fade, screen icon in the header, dashboard greeting banner with quick actions, KPI cards (icons, tone stripe, count-up, hover lift, rows filled edge to edge), 14-day area chart with tooltips, payments donut, grid zebra, hover and empty states, POS line flash on scan, net payable count-up (dimmed while the host reprices), sale-complete card with change, card hidden by the next scan, approval toast (click opens Approvals), message bars with icons. Both client targets build with no warnings. Mono draws gradients with visible banding; Windows GDI+ does not.
+
 ## Optimisation pass
 Database: the stress run's database (20,000 medicines, about 36,000 invoices posted on one day, 188 MB). Each figure is the median of three warm requests over HTTPS; 4 vCPU VM.
 
 | Request | Before | After | Change |
 |---|---|---|---|
-| Dashboard (`/reports/dashboard`) | 458 ms | 5–8 ms (cached), about 210 ms (rebuild after a write) | Cached per host and invalidated by any write or after 10 s; finance figures removed per user after the cache |
+| Dashboard (`/dashboard`) | 458 ms | 5–8 ms (cached), about 210 ms (rebuild after a write) | Cached on the host; rebuilt at most every 10 s and only after a write; finance figures removed per user after the cache |
 | Report: current stock | 886 ms | 613 ms | Packs loaded in one query instead of one per medicine |
 | Report: daily sales | 568 ms | 376 ms | Payment methods aggregated once in a CTE, not per row |
 | Report: audit log | 532 ms | 330 ms | Same pack and join fixes |

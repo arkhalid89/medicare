@@ -18,10 +18,24 @@ internal sealed class BrandPanel : Panel
     {
         var g = e.Graphics;
         Theme.Smooth(g);
-        g.Clear(BackColor);
+        using (var bg = new System.Drawing.Drawing2D.LinearGradientBrush(ClientRectangle, Theme.Accent, Theme.AccentDeep, System.Drawing.Drawing2D.LinearGradientMode.ForwardDiagonal))
+            g.FillRectangle(bg, ClientRectangle);
+        // soft rings and a large faint cross
+        using (var ring = new Pen(Color.FromArgb(20, Color.White), Theme.S(22)))
+        {
+            g.DrawEllipse(ring, Width - Theme.S(150), -Theme.S(120), Theme.S(300), Theme.S(300));
+            g.DrawEllipse(ring, -Theme.S(90), Height - Theme.S(200), Theme.S(260), Theme.S(260));
+        }
+        using (var cross = new SolidBrush(Color.FromArgb(14, Color.White)))
+        {
+            var cx = Width - Theme.S(70); var cy = Height - Theme.S(110); var arm = Theme.S(22); var len = Theme.S(70);
+            g.FillRectangle(cross, cx - arm, cy - len, arm * 2, len * 2);
+            g.FillRectangle(cross, cx - len, cy - arm, len * 2, arm * 2);
+        }
         var pad = Theme.S(32);
+        Theme.Shadow(g, new Rectangle(pad, pad, Theme.S(48), Theme.S(48)), Theme.S(12), 2f);
         using (var b = new SolidBrush(Color.White))
-        using (var path = Theme.Rounded(new Rectangle(pad, pad, Theme.S(48), Theme.S(48)), Theme.S(10)))
+        using (var path = Theme.Rounded(new Rectangle(pad, pad, Theme.S(48), Theme.S(48)), Theme.S(12)))
             g.FillPath(b, path);
         using (var p = new Pen(Theme.Accent, Theme.S(6)))
         {
@@ -384,6 +398,7 @@ internal sealed class ThisPcDialog : DialogForm
     private readonly UiCheck _auto = new UiCheck("Print the receipt automatically after each sale");
     private readonly UiCheck _drawer = new UiCheck("Open the cash drawer on cash sales (printer-driven drawer)");
     private readonly UiCheck _compact = new UiCheck("Compact layout (more rows on small screens; applies after restart)");
+    private readonly UiCheck _motion = new UiCheck("Animations (turn off on very slow PCs)");
 
     public ThisPcDialog() : base("This PC", 520)
     {
@@ -399,6 +414,7 @@ internal sealed class ThisPcDialog : DialogForm
         _auto.Checked = cfg.AutoPrintReceipt;
         _drawer.Checked = cfg.OpenCashDrawer;
         _compact.Checked = cfg.Compact;
+        _motion.Checked = cfg.Animations;
         var f = new FieldGrid(2);
         f.Add("Counter number", _counter, hint: "Takes effect at the next log in");
         f.Add("Receipt width", _width);
@@ -407,6 +423,7 @@ internal sealed class ThisPcDialog : DialogForm
         f.AddFull(_auto);
         f.AddFull(_drawer);
         f.AddFull(_compact);
+        f.AddFull(_motion);
         var test = new UiButton("Print a test receipt");
         test.Click += (_, _) => { Apply(); Printers.TestReceipt(this); };
         f.AddFull(test);
@@ -426,5 +443,7 @@ internal sealed class ThisPcDialog : DialogForm
         cfg.AutoPrintReceipt = _auto.Checked;
         cfg.OpenCashDrawer = _drawer.Checked;
         cfg.Compact = _compact.Checked;
+        cfg.Animations = _motion.Checked;
+        Program.ApplyMotion();
     }
 }

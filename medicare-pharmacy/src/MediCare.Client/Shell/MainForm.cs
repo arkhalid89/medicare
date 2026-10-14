@@ -22,6 +22,8 @@ public sealed class MainForm : Form, IMessageFilter
     private readonly Label _statusLeft = new Label();
     private readonly Label _statusRight = new Label();
     private readonly Label _banner = new Label();
+    private readonly BusyBar _busy = new BusyBar();
+    private string _screenIcon = "";
     private readonly System.Windows.Forms.Timer _clock = new System.Windows.Forms.Timer { Interval = 15000 };
     private readonly Dictionary<string, AppScreen> _screens = new Dictionary<string, AppScreen>();
     private readonly CancellationTokenSource _cts = new CancellationTokenSource();
@@ -31,6 +33,7 @@ public sealed class MainForm : Form, IMessageFilter
     private bool _locked, _online = true;
     private readonly Action<ApiException> _onAuthLost;
     private readonly Action<bool> _onReach;
+    private readonly Action<int> _onBusy;
 
     /// <summary>True when the person logged out (the program shows the login again); false when the window was closed.</summary>
     public bool LoggedOut { get; private set; }
@@ -59,7 +62,7 @@ public sealed class MainForm : Form, IMessageFilter
         _banner.Font = Theme.UiBold;
 
         var right = new Panel { Dock = DockStyle.Fill };
-        right.Stack(_header, _banner, _keys, _content);
+        right.Stack(_header, _busy, _banner, _keys, _content);
         Controls.Add(right);
         Controls.Add(_nav);
         Controls.Add(_status);
@@ -72,6 +75,8 @@ public sealed class MainForm : Form, IMessageFilter
         _onReach = ok => BeginInvokeSafe(() => SetOnline(ok));
         Session.Api.AuthLost += _onAuthLost;
         Session.Api.Reachability += _onReach;
+        _onBusy = n => BeginInvokeSafe(() => _busy.Busy = n > 0);
+        Session.Api.InFlightChanged += _onBusy;
         _clock.Tick += (_, _) => Tick();
         Application.AddMessageFilter(this);
     }
@@ -83,16 +88,27 @@ public sealed class MainForm : Form, IMessageFilter
         _header.Dock = DockStyle.Top;
         _header.Height = Theme.HeaderHeight;
         _header.BackColor = Theme.Surface;
-        _header.Padding = new Padding(Theme.S(20), 0, Theme.S(12), 0);
-        _header.Paint += (_, e) => { using var p = new Pen(Theme.Line); e.Graphics.DrawLine(p, 0, _header.Height - 1, _header.Width, _header.Height - 1); };
+        _header.Padding = new Padding(Theme.S(20), 0, Theme.S(12), 1);
+        _header.Paint += (_, e) =>
+        {
+            var g = e.Graphics;
+            using (var p = new Pen(Theme.Line)) g.DrawLine(p, 0, _header.Height - 1, _header.Width, _header.Height - 1);
+            if (_screenIcon.Length == 0) return;
+            Theme.Smooth(g);
+            var chip = new Rectangle(Theme.S(20), (_header.Height - Theme.S(36)) / 2, Theme.S(36), Theme.S(36));
+            using (var b = new SolidBrush(Theme.Select))
+            using (var path = Theme.Rounded(chip, Theme.S(10)))
+                g.FillPath(b, path);
+            Icons.Draw(g, _screenIcon, new RectangleF(chip.X + Theme.S(8), chip.Y + Theme.S(8), Theme.S(20), Theme.S(20)), Theme.Accent, 2.2f);
+        };
         _title.Font = Theme.Title;
         _title.ForeColor = Theme.Ink;
         _title.AutoSize = true;
-        _title.Location = new Point(Theme.S(20), Theme.S(8));
+        _title.Location = new Point(Theme.S(66), Theme.S(7));
         _subtitle.Font = Theme.Small;
         _subtitle.ForeColor = Theme.InkMuted;
         _subtitle.AutoSize = true;
-        _subtitle.Location = new Point(Theme.S(22), Theme.S(34));
+        _subtitle.Location = new Point(Theme.S(68), Theme.S(33));
         _headerRight.Dock = DockStyle.Right;
         _headerRight.AutoSize = true;
         _headerRight.AutoSizeMode = AutoSizeMode.GrowAndShrink;
@@ -196,6 +212,8 @@ public sealed class MainForm : Form, IMessageFilter
             _current = screen;
         }
         _nav.Select(key);
+        _screenIcon = Icons.ForScreen(key);
+        _header.Invalidate();
         _title.Text = screen.Title;
         _subtitle.Text = screen.Subtitle;
         _keys.SetKeys(screen.FKeys);
@@ -226,7 +244,11 @@ public sealed class MainForm : Form, IMessageFilter
         if (keyData == (Keys.Control | Keys.L)) { Lock(); return true; }
         if (keyData == (Keys.Control | Keys.G)) { GoTo(); return true; }
         if (keyData == Keys.F1) { ShowHelp(); return true; }
-        if (_current != null && IsCommandKey(keyData) && _current.HandleKey(keyData)) return true;
+        if (_current != null && IsCommandKey(keyData) && _current.HandleKey(keyData))
+        {
+            _keys.Flash(keyData);
+            return true;
+        }
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
@@ -328,6 +350,7 @@ public sealed class MainForm : Form, IMessageFilter
 
     private void SetOnline(bool ok)
     {
+        if (ok && !_online) Toast.Show(this, "Connected to the host again", "You can carry on. Anything you were saving can be sent again safely.", Tone.Ok);
         _online = ok;
         UpdateStatus();
         if (!ok) ShowBanner($"Host {Session.Api.HostName} is unreachable. Nothing can be saved until it is back. Retrying every 15 seconds.", Tone.Danger);
@@ -351,11 +374,19 @@ public sealed class MainForm : Form, IMessageFilter
         switch (e.Type)
         {
             case EventTypes.ApprovalRequested:
+                UiRun.Fire(this, RefreshBadges);
+                if (Session.Can(Perm.ApprovalsView))
+                    Toast.Show(this, "Approval requested", $"A {ApprovalWhat(e.Payload)} is waiting for a manager's decision. Click to open Approvals.", Tone.Warn, () => Open("approvals"), 8000);
+                break;
             case EventTypes.ApprovalDecided:
                 UiRun.Fire(this, RefreshBadges);
                 break;
             case EventTypes.SettingsChanged:
-                UiRun.Fire(this, async () => Session.UpdateSettings(await Session.Api.Get<ClientSettings>("settings/client")));
+                UiRun.Fire(this, async () =>
+                {
+                    Session.UpdateSettings(await Session.Api.Get<ClientSettings>("settings/client"));
+                    Toast.Show(this, "Settings updated", "An administrator changed the shop settings. They apply now.", Tone.Info);
+                });
                 break;
             case EventTypes.Maintenance:
                 ShowBanner("The host is restoring a backup. Finish what you are typing; you will be asked to log in again shortly.", Tone.Warn);
@@ -368,6 +399,20 @@ public sealed class MainForm : Form, IMessageFilter
                 break;
         }
         foreach (var s in _screens.Values) s.OnHostEvent(e);
+    }
+
+    /// <summary>"discount request", "refund request"... from the event payload; a plain "request" if it cannot be read.</summary>
+    private static string ApprovalWhat(string? payload)
+    {
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(payload ?? "{}");
+            foreach (var p in doc.RootElement.EnumerateObject())
+                if (p.Name.Equals("action", StringComparison.OrdinalIgnoreCase) && p.Value.ValueKind == System.Text.Json.JsonValueKind.String)
+                    return p.Value.GetString()!.Replace('_', ' ').ToLowerInvariant() + " request";
+        }
+        catch (System.Text.Json.JsonException) { }
+        return "request";
     }
 
     public async Task RefreshBadges()
@@ -413,6 +458,7 @@ public sealed class MainForm : Form, IMessageFilter
         Session.SettingsChanged -= OnSettingsChanged;
         Session.Api.AuthLost -= _onAuthLost;
         Session.Api.Reachability -= _onReach;
+        Session.Api.InFlightChanged -= _onBusy;
         _cts.Cancel();
         _clock.Stop();
         foreach (var s in _screens.Values.Where(s => s != _current)) s.Dispose();

@@ -57,6 +57,10 @@ public sealed class ApiClient : IDisposable
     public event Action<bool>? Reachability;
 
     private bool _reachable = true;
+    private int _inFlight;
+
+    /// <summary>Number of requests waiting for the host changed (drives the busy line under the header). May fire on any thread.</summary>
+    public event Action<int>? InFlightChanged;
 
     static ApiClient()
     {
@@ -182,6 +186,7 @@ public sealed class ApiClient : IDisposable
 
     private async Task<HttpResponseMessage> Exchange(HttpClient client, HttpRequestMessage req, HttpCompletionOption option = HttpCompletionOption.ResponseContentRead)
     {
+        InFlightChanged?.Invoke(Interlocked.Increment(ref _inFlight));
         try
         {
             var resp = await client.SendAsync(req, option).ConfigureAwait(true);
@@ -201,6 +206,10 @@ public sealed class ApiClient : IDisposable
             throw new ApiException(0, ApiException.Offline,
                 $"The host {HostName} did not answer. Check that the host PC is on and the network cable is connected. " +
                 "If you were saving, press the same button again when it is back. It will not be saved twice.");
+        }
+        finally
+        {
+            InFlightChanged?.Invoke(Interlocked.Decrement(ref _inFlight));
         }
     }
 

@@ -14,6 +14,8 @@ public class Grid : DataGridView
     /// <summary>Optional per-row tone (expired = danger, near expiry = warn...).</summary>
     public Func<object, Tone>? RowTone { get; set; }
     public string EmptyText { get; set; } = "Nothing to show.";
+    public string EmptyIcon { get; set; } = "inbox";
+    private int _hoverRow = -1;
 
     public Grid()
     {
@@ -55,6 +57,7 @@ public class Grid : DataGridView
             Padding = new Padding(Theme.S(6), 0, Theme.S(6), 0),
             WrapMode = DataGridViewTriState.False,
         };
+        AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Theme.Hex("#FAFCFC") };
         RowTemplate.Height = Theme.RowHeight;
         StandardTab = true;
         ShowCellToolTips = true;
@@ -164,13 +167,79 @@ public class Grid : DataGridView
         if (e.RowIndex >= 0 && Rows[e.RowIndex].Tag != null) RowActivated?.Invoke(Rows[e.RowIndex].Tag!);
     }
 
+    /// <summary>Briefly highlights a row (a line just added or changed). Follows the row's item if the rows are rebuilt meanwhile.</summary>
+    public void Flash(int index)
+    {
+        if (index < 0 || index >= RowCount) return;
+        var tag = Rows[index].Tag;
+        DataGridViewRow? row = null;
+        Color back = Color.Empty, sel = Color.Empty;
+        Motion.Run(this, "flash", 700, t =>
+        {
+            var current = tag == null ? (index < RowCount ? Rows[index] : null) : Rows.Cast<DataGridViewRow>().FirstOrDefault(r => ReferenceEquals(r.Tag, tag));
+            if (current == null) return;
+            if (current != row)
+            {
+                // first frame on this row object: remember its own colours to fade back to
+                row = current;
+                back = row.DefaultCellStyle.BackColor;
+                sel = row.DefaultCellStyle.SelectionBackColor;
+            }
+            var style = row.DefaultCellStyle;
+            var done = t >= 1f;
+            style.BackColor = done ? back : Theme.Blend(Theme.AccentSoft, back.IsEmpty ? Theme.Surface : back, t);
+            style.SelectionBackColor = done ? sel : Theme.Blend(Theme.Hex("#9FD3D6"), sel.IsEmpty ? Theme.Select : sel, t);
+        }, ease: Motion.EaseInOut);
+    }
+
+    // ---- hover highlight ----
+    protected override void OnCellMouseEnter(DataGridViewCellEventArgs e)
+    {
+        base.OnCellMouseEnter(e);
+        if (e.RowIndex == _hoverRow) return;
+        var old = _hoverRow;
+        _hoverRow = e.RowIndex;
+        if (old >= 0 && old < RowCount) InvalidateRow(old);
+        if (_hoverRow >= 0 && _hoverRow < RowCount) InvalidateRow(_hoverRow);
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        base.OnMouseLeave(e);
+        var old = _hoverRow;
+        _hoverRow = -1;
+        if (old >= 0 && old < RowCount) InvalidateRow(old);
+    }
+
+    protected override void OnCellFormatting(DataGridViewCellFormattingEventArgs e)
+    {
+        base.OnCellFormatting(e);
+        if (e.RowIndex >= 0 && e.RowIndex == _hoverRow && e.CellStyle != null && !Rows[e.RowIndex].Selected)
+            e.CellStyle.BackColor = Theme.Blend(e.CellStyle.BackColor.IsEmpty ? Theme.Surface : e.CellStyle.BackColor, Theme.Accent, 0.07f);
+    }
+
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e);
         if (RowCount == 0 && EmptyText.Length > 0)
         {
-            var r = new Rectangle(0, ColumnHeadersHeight, Width, Math.Max(Height - ColumnHeadersHeight, Theme.S(40)));
-            TextRenderer.DrawText(e.Graphics, EmptyText, Theme.Ui, r, Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
+            var g = e.Graphics;
+            var area = new Rectangle(0, ColumnHeadersHeight, Width, Math.Max(Height - ColumnHeadersHeight, Theme.S(40)));
+            var icon = Theme.S(36);
+            var showIcon = EmptyIcon.Length > 0 && area.Height >= Theme.S(120);
+            var textSize = TextRenderer.MeasureText(g, EmptyText, Theme.Ui, new Size(Math.Max(Width - Theme.S(40), 100), 0), TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix);
+            var block = textSize.Height + (showIcon ? icon + Theme.S(12) : 0);
+            var y = area.Top + (area.Height - block) / 2;
+            if (showIcon)
+            {
+                Theme.Smooth(g);
+                var chip = new Rectangle((Width - icon - Theme.S(20)) / 2, y - Theme.S(10), icon + Theme.S(20), icon + Theme.S(20));
+                using (var b = new SolidBrush(Theme.SurfaceAlt)) g.FillEllipse(b, chip);
+                var glyph = icon - Theme.S(8);
+                Icons.Draw(g, EmptyIcon, new RectangleF(chip.X + (chip.Width - glyph) / 2f, chip.Y + (chip.Height - glyph) / 2f, glyph, glyph), Theme.LineStrong, 1.8f);
+                y += icon + Theme.S(16);
+            }
+            TextRenderer.DrawText(g, EmptyText, Theme.Ui, new Rectangle(Theme.S(20), y, Width - Theme.S(40), textSize.Height + Theme.S(4)), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.WordBreak);
         }
     }
 

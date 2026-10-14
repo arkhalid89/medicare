@@ -73,7 +73,9 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
     private readonly Label _tax = new UiLabel("", Theme.Num);
     private readonly Label _net = new UiLabel("0.00", Theme.Total, Theme.Ink);
     private readonly Label _last = new UiLabel("", Theme.Small, Theme.InkMuted);
-    private readonly UiButton _pay = new UiButton("Take payment", ButtonKind.Primary, "F4");
+    private readonly UiButton _pay = new UiButton("Take payment", ButtonKind.Primary, "F4") { Icon = "cash" };
+    private readonly SaleDoneView _done = new SaleDoneView { Dock = DockStyle.Fill };
+    private decimal _netShown;
     private readonly Timer _quoteTimer = new Timer { Interval = 150 };
     private readonly Timer _searchTimer = new Timer { Interval = 250 };
 
@@ -130,6 +132,9 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
         _grid.KeyDown += GridKeyDown;
         var cartCard = new Card { Dock = DockStyle.Fill, Padding = new Padding(1) };
         cartCard.Controls.Add(_grid);
+        cartCard.Controls.Add(_done);
+        _done.BringToFront();
+        _done.Click += (_, _) => _scan.Focus();
 
         // ---- search results overlay ----
         _results.Col("Medicine", 0, ColKind.Text, 260);
@@ -398,11 +403,13 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
             existing.Qty++;
             existing.Error = null;
             Changed(existing);
+            _grid.Flash(_cart.IndexOf(existing));
             return;
         }
         var line = new CartLine { Med = med, Pack = pack, BatchId = batchId, Pick = pick, BatchLabel = batchLabel };
         _cart.Add(line);
         Changed(line);
+        _grid.Flash(_cart.IndexOf(line));
         if (line.Controlled) Fail($"{med.Name} is a Schedule {med.Schedule} medicine. The prescription details will be asked for at payment.", Tone.Info);
         else if (med.RxRequired) Fail($"{med.Name} needs a prescription. Check it before selling.", Tone.Info);
     }
@@ -415,6 +422,7 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
         l.Qty = qty;
         l.Error = null;
         Changed(l);
+        _grid.Flash(_cart.IndexOf(l));
     }
 
     private void RemoveSelected()
@@ -529,12 +537,25 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
         _discount.Text = empty ? "0.00" : q == null ? "…" : q.Discount == 0 ? "0.00" : $"-{Money.Format(q.Discount)} ({q.DiscountPercent:0.##}%)";
         _discount.ForeColor = q != null && q.DiscountPercent > (Session.Login?.MaxDiscountPercent ?? 0) ? Theme.Warn : Theme.Ink;
         _tax.Text = empty ? "0.00" : q == null ? "…" : Money.Format(q.Tax);
-        _net.Text = _cart.Count == 0 ? "0.00" : q == null ? "…" : Money.Format(q.Net);
+        SetNet(empty ? 0m : q?.Net);
+        if (!empty) _done.Visible = false;
         _pay.Enabled = _cart.Count > 0;
         _customerButton.Text = _customer == null ? "Walk-in customer" : _customer.Name + (_customer.Type == "CREDIT" || _customer.Balance != 0 ? $"  ·  due {Money.Format(_customer.Balance)}" : "");
         _customerButton.Kind = _customer == null ? ButtonKind.Secondary : ButtonKind.Accent;
         ShowLine();
         Shell?.RefreshKeys();
+    }
+
+    /// <summary>Net payable counts to the new figure; while a new price is on its way the old one is dimmed instead of blanked.</summary>
+    private void SetNet(decimal? net)
+    {
+        if (net == null) { _net.ForeColor = Theme.LineStrong; return; }
+        _net.ForeColor = Theme.Accent;
+        var from = _netShown;
+        var to = net.Value;
+        if (from == to) { _net.Text = Money.Format(to); return; }
+        _netShown = to;
+        Motion.Run(_net, "count", 320, t => _net.Text = Money.Format(t >= 1f ? to : Math.Round(from + (to - from) * (decimal)t, 2)));
     }
 
     private void ShowLine()
@@ -742,7 +763,8 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
         Reset();
         _last.Text = $"Last sale {result.No} · Rs {Money.Format(result.Net)}" + (result.Change > 0 ? $" · change Rs {Money.Format(result.Change)}" : "");
         if (!printed) Bar.Show($"Sale {result.No} is saved, but the receipt did not print. Check the printer, then press F8 to reprint.", Tone.Warn);
-        else Bar.Show(result.Change > 0 ? $"Sale {result.No} saved.  GIVE CHANGE: Rs {Money.Format(result.Change)}" : $"Sale {result.No} saved.", Tone.Ok);
+        var paidBy = string.Join(" + ", req.Payments.Select(p => p.Method).Distinct().Select(m => m.Length == 0 ? m : m.Substring(0, 1) + m.Substring(1).ToLowerInvariant()));
+        _done.ShowSale(result.No, result.Net, result.Change, paidBy.Length > 0 ? "Paid by " + paidBy : "Saved", printed);
         _scan.Focus();
         await Task.CompletedTask;
     }

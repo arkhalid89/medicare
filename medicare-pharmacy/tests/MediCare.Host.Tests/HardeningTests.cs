@@ -145,7 +145,8 @@ public class HardeningTests
         var catalog = await api.Get<List<ReportInfo>>("/api/v1/reports");
         var customerId = (await api.Get<List<CustomerDto>>("/api/v1/customers")).First().Id;
         Assert.Equal(26, catalog.Count);
-        var today = DateTime.Today.ToString("yyyy-MM-dd");
+        // the host's business day (Pakistan time), not this machine's calendar date
+        var today = (await api.Get<ClientSettings>("/api/v1/settings/client")).BusinessDate;
         foreach (var r in catalog)
         {
             var q = string.Join("&", r.Params.Select(p => p.Type switch

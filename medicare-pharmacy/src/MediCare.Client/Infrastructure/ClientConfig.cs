@@ -23,6 +23,7 @@ public sealed class ClientConfig
     public string A4Printer { get; set; } = "";
     public bool Compact { get; set; }
     public bool SoundOnScanError { get; set; } = true;
+    public bool Animations { get; set; } = true;
 
     public bool IsPaired => HostUrl.Length > 0 && Fingerprint.Length > 0 || HostUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
 
