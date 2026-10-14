@@ -5,3 +5,5 @@ obj/
 TestResults/
 publish/
 artifacts/
+installer/fonts/*.ttf
+installer/fonts/OFL-*.txt

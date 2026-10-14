@@ -10,13 +10,13 @@ Use the **static** TTF files. Do not use variable fonts (file names with `[wght]
 
 | File (exact name) | Family | Registered as | Used for |
 |---|---|---|---|
-| `AtkinsonHyperlegible-Regular.ttf` | Atkinson Hyperlegible | Atkinson Hyperlegible | UI text |
+| `AtkinsonHyperlegible-Regular.ttf` | Atkinson Hyperlegible | Atkinson Hyperlegible Regular | UI text |
 | `AtkinsonHyperlegible-Bold.ttf` | Atkinson Hyperlegible | Atkinson Hyperlegible Bold | UI headings, buttons |
 | `AtkinsonHyperlegible-Italic.ttf` | Atkinson Hyperlegible | Atkinson Hyperlegible Italic | hints |
 | `AtkinsonHyperlegible-BoldItalic.ttf` | Atkinson Hyperlegible | Atkinson Hyperlegible Bold Italic | completeness of the family |
-| `IBMPlexMono-Regular.ttf` | IBM Plex Mono | IBM Plex Mono | amounts, batch numbers, document numbers |
+| `IBMPlexMono-Regular.ttf` | IBM Plex Mono | IBM Plex Mono Regular | amounts, batch numbers, document numbers |
 | `IBMPlexMono-Bold.ttf` | IBM Plex Mono | IBM Plex Mono Bold | totals |
-| `NotoNaskhArabic-Regular.ttf` | Noto Naskh Arabic | Noto Naskh Arabic | Urdu lines on receipts |
+| `NotoNaskhArabic-Regular.ttf` | Noto Naskh Arabic | Noto Naskh Arabic Regular | Urdu lines on receipts |
 | `NotoNaskhArabic-Bold.ttf` | Noto Naskh Arabic | Noto Naskh Arabic Bold | Urdu headings on receipts |
 | `OFL-AtkinsonHyperlegible.txt` | licence | - | installed to `Licenses\Fonts` |
 | `OFL-IBMPlexMono.txt` | licence | - | installed to `Licenses\Fonts` |
@@ -47,5 +47,7 @@ Use the original "Atkinson Hyperlegible" family, not "Atkinson Hyperlegible Next
 Atkinson Hyperlegible (Copyright 2020 Braille Institute of America, Inc.), IBM Plex Mono (Copyright 2017 IBM Corp.) and Noto Naskh Arabic (Copyright 2022 The Noto Project Authors) are each licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org). The installers copy the `OFL-*.txt` files from this folder to `<install folder>\Licenses\Fonts\` to meet the licence's requirement that the licence accompanies the fonts. Do not rename the font families or sell the fonts on their own. Check the copyright line in each downloaded `OFL.txt`; the one in the file is authoritative.
 
 ## Checking the registered names
+The registered name is the font's full name (name table ID 4), which is what Explorer shows when the file is opened; for these releases the regular weights end in "Regular". On Linux, `fc-scan --format '%{fullname[0]}' file.ttf` prints it.
+
 
 `FontInstall:` in `fonts.iss` must match the font's full name. After installing on a test PC, check `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts`. If a newer release of a font uses a different full name, update `fonts.iss`.

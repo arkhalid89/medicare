@@ -10,13 +10,13 @@
 ; programs may use them. FontInstall must be the font's full name as Windows lists it.
 
 [Files]
-Source: "fonts\AtkinsonHyperlegible-Regular.ttf"; DestDir: "{autofonts}"; FontInstall: "Atkinson Hyperlegible"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
+Source: "fonts\AtkinsonHyperlegible-Regular.ttf"; DestDir: "{autofonts}"; FontInstall: "Atkinson Hyperlegible Regular"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
 Source: "fonts\AtkinsonHyperlegible-Bold.ttf"; DestDir: "{autofonts}"; FontInstall: "Atkinson Hyperlegible Bold"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
 Source: "fonts\AtkinsonHyperlegible-Italic.ttf"; DestDir: "{autofonts}"; FontInstall: "Atkinson Hyperlegible Italic"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
 Source: "fonts\AtkinsonHyperlegible-BoldItalic.ttf"; DestDir: "{autofonts}"; FontInstall: "Atkinson Hyperlegible Bold Italic"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
-Source: "fonts\IBMPlexMono-Regular.ttf"; DestDir: "{autofonts}"; FontInstall: "IBM Plex Mono"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
+Source: "fonts\IBMPlexMono-Regular.ttf"; DestDir: "{autofonts}"; FontInstall: "IBM Plex Mono Regular"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
 Source: "fonts\IBMPlexMono-Bold.ttf"; DestDir: "{autofonts}"; FontInstall: "IBM Plex Mono Bold"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
-Source: "fonts\NotoNaskhArabic-Regular.ttf"; DestDir: "{autofonts}"; FontInstall: "Noto Naskh Arabic"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
+Source: "fonts\NotoNaskhArabic-Regular.ttf"; DestDir: "{autofonts}"; FontInstall: "Noto Naskh Arabic Regular"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
 Source: "fonts\NotoNaskhArabic-Bold.ttf"; DestDir: "{autofonts}"; FontInstall: "Noto Naskh Arabic Bold"; Flags: onlyifdoesntexist uninsneveruninstall skipifsourcedoesntexist
 ; The OFL requires the licence to travel with the fonts.
 Source: "fonts\OFL-*.txt"; DestDir: "{app}\Licenses\Fonts"; Flags: ignoreversion skipifsourcedoesntexist

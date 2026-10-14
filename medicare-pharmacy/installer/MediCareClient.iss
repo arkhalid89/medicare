@@ -83,14 +83,14 @@ Name: "{autodesktop}\MediCare Pharmacy"; Filename: "{app}\{#ExeName}"; Comment: 
 
 #if Target == "win7"
 [Registry]
-; Same settings as scripts\enable-tls12-win7.ps1. Kept on uninstall: they are system-wide security settings
+; Same settings as scripts\enable-tls12-win7.ps1. No uninsdelete* flag, so they stay after uninstall: they are system-wide security settings
 ; that other software may rely on once enabled.
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client"; ValueType: dword; ValueName: "Enabled"; ValueData: 1; Flags: uninsneveruninstall; Tasks: tls12
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client"; ValueType: dword; ValueName: "DisabledByDefault"; ValueData: 0; Flags: uninsneveruninstall; Tasks: tls12
-Root: HKLM32; Subkey: "SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; ValueType: dword; ValueName: "SchUseStrongCrypto"; ValueData: 1; Flags: uninsneveruninstall; Tasks: tls12
-Root: HKLM32; Subkey: "SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; ValueType: dword; ValueName: "SystemDefaultTlsVersions"; ValueData: 1; Flags: uninsneveruninstall; Tasks: tls12
-Root: HKLM64; Subkey: "SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; ValueType: dword; ValueName: "SchUseStrongCrypto"; ValueData: 1; Flags: uninsneveruninstall; Tasks: tls12; Check: IsWin64
-Root: HKLM64; Subkey: "SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; ValueType: dword; ValueName: "SystemDefaultTlsVersions"; ValueData: 1; Flags: uninsneveruninstall; Tasks: tls12; Check: IsWin64
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client"; ValueType: dword; ValueName: "Enabled"; ValueData: 1; Tasks: tls12
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client"; ValueType: dword; ValueName: "DisabledByDefault"; ValueData: 0; Tasks: tls12
+Root: HKLM32; Subkey: "SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; ValueType: dword; ValueName: "SchUseStrongCrypto"; ValueData: 1; Tasks: tls12
+Root: HKLM32; Subkey: "SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; ValueType: dword; ValueName: "SystemDefaultTlsVersions"; ValueData: 1; Tasks: tls12
+Root: HKLM64; Subkey: "SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; ValueType: dword; ValueName: "SchUseStrongCrypto"; ValueData: 1; Tasks: tls12; Check: IsWin64
+Root: HKLM64; Subkey: "SOFTWARE\Microsoft\.NETFramework\v4.0.30319"; ValueType: dword; ValueName: "SystemDefaultTlsVersions"; ValueData: 1; Tasks: tls12; Check: IsWin64
 #endif
 
 [Run]

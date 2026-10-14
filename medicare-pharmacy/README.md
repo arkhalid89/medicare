@@ -39,6 +39,8 @@ Release build and installers (Windows, PowerShell 7):
 ```
 pwsh ./build.ps1
 ```
+On Linux, `./build.sh` does the same with Inno Setup running under Wine (setup notes at the top of the script).
+
 Outputs: `artifacts/installers/MediCarePharmacy-Host-Setup-*.exe`, `MediCarePharmacy-Client-win10-Setup-*.exe`, `MediCarePharmacy-Client-win7-Setup-*.exe`. Details: [installer/README.md](installer/README.md).
 
 ## Install and operate

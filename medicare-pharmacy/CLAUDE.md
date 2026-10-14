@@ -28,7 +28,7 @@ Do not read all of `docs/` up front.
 | `src/MediCare.Client` | WinForms: `Shell/` (main form, login, navigation), `Screens/`, `Dialogs/`, `Ui/` (theme and controls), `Printing/`, `Infrastructure/` (API client, session, config) |
 | `src/MediCare.HostMonitor` | Tray app on the host PC: service state, fingerprint, backups |
 | `tests/` | `MediCare.Core.Tests` (unit), `MediCare.Host.Tests` (end-to-end over HTTP with a temp database) |
-| `installer/`, `build.ps1` | Installers and the release build |
+| `installer/`, `build.ps1`, `build.sh` | Installers and the release build (Windows / Linux) |
 
 ## Commands
 ```
@@ -38,6 +38,7 @@ dotnet test tests/MediCare.Host.Tests                  # end-to-end scenarios (t
 dotnet build src/MediCare.Client -f net48              # Windows 7 client only
 dotnet run --project src/MediCare.Host                 # host on http(s)://0.0.0.0:8443, data in %ProgramData%\MediCarePharmacy\Data (or ~/medicare-data)
 pwsh ./build.ps1                                       # Windows: tests, publish all, compile installers
+./build.sh                                             # Linux: same, Inno Setup under Wine (setup notes inside)
 dotnet run -c Release --project tests/MediCare.LoadTest -- --url https://HOST:8443 --minutes 60 --rate 3   # S25 load test (results: docs/04-development/test-results.md)
 ```
 Migrations run automatically at host start (`Db.Migrate`); add a new `Sql/NNNN_name.sql`, never edit a shipped one.

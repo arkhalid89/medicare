@@ -38,6 +38,19 @@ The version comes from `<Version>` in `Directory.Build.props`. To compile one in
 & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DTarget=win7 installer\MediCareClient.iss
 ```
 
+### Building on Linux (no Windows PC)
+
+`build.sh` does the same steps on Linux: .NET publishes the Windows builds directly (including the net48 client, with version and icon resources), and Inno Setup's compiler runs under Wine. One-time setup and usage are at the top of `build.sh`:
+
+```bash
+sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get install wine64 wine32:i386 xvfb
+WINEPREFIX=~/.wine-inno wine innosetup-6.5.4.exe /VERYSILENT /SUPPRESSMSGBOXES /DIR='C:\InnoSetup6'
+./build.sh                  # tests, publish, installers
+./build.sh --skip-tests
+```
+
+Inno Setup itself is 32-bit, so Wine needs its 32-bit part (`wine32:i386`). The installers are byte-for-byte ordinary Inno Setup output; Wine is only the compiler's runtime. Installing them still needs Windows (the host installer registers a Windows service and firewall rule with PowerShell).
+
 Code signing: sign `MediCare.Host.exe`, `MediCare.HostMonitor.exe`, `MediCarePharmacy.exe` and the setup files with the owner's certificate before release (avoids SmartScreen warnings, ADR-016). Add a `SignTool=` line to the `[Setup]` sections once the certificate is available.
 
 ## Installing a shop
