@@ -1,0 +1,666 @@
+<title>MediCare Pharmacy Directions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow:wght@400;500;600;700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Noto+Naskh+Arabic:wght@400;600&family=Noto+Nastaliq+Urdu:wght@400;600&display=swap">
+<style>
+/* Layout: a quiet reading column for the comparison, with each direction's POS screen shown full-width in its own scroll frame. Page chrome stays neutral so the three directions carry the colour. */
+:root{
+  --bg:#F3F5F6; --surface:#FFFFFF; --ink:#141B1E; --muted:#526066; --line:#D7DEE1; --mark:#0B6E74;
+  --chip:#E6EEEF;
+  --f-head:"Hanken Grotesk",system-ui,"Segoe UI",sans-serif;
+  --f-body:"Hanken Grotesk",system-ui,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:24px;--s6:32px;--s7:48px;--s8:64px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1416; --surface:#161D20; --ink:#E6ECEE; --muted:#9AA9AE; --line:#2A3639; --mark:#5CC8D6; --chip:#1F292C; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1416; --surface:#161D20; --ink:#E6ECEE; --muted:#9AA9AE; --line:#2A3639; --mark:#5CC8D6; --chip:#1F292C; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:var(--s6) var(--s8)}
+.wrap{max-width:1240px;margin-inline:auto;display:grid;gap:var(--s8)}
+h1,h2,h3{font-family:var(--f-head);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:clamp(22px,3vw,30px);font-weight:700}
+h3{font-size:15px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+p{margin:0;max-width:68ch}
+a{color:var(--mark)}
+:focus-visible{outline:3px solid var(--mark);outline-offset:2px}
+.eyebrow{font-family:var(--f-mono);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.intro{display:grid;gap:var(--s4)}
+.jump{display:flex;flex-wrap:wrap;gap:var(--s2);margin-top:var(--s2)}
+.jump a{font-family:var(--f-mono);font-size:14px;text-decoration:none;color:var(--ink);background:var(--chip);border:1px solid var(--line);padding:6px 12px;border-radius:999px}
+.jump a:hover{border-color:var(--mark)}
+
+.dir{display:grid;gap:var(--s5);scroll-margin-top:var(--s5)}
+.dir-head{display:grid;grid-template-columns:auto 1fr;gap:var(--s2) var(--s5);align-items:baseline}
+.dir-letter{font-family:var(--f-mono);font-size:56px;font-weight:600;line-height:1;color:var(--mark)}
+.dir-head .meta{display:grid;gap:var(--s2);min-width:0}
+.mood{display:flex;flex-wrap:wrap;gap:var(--s2)}
+.mood span{font-size:13px;font-family:var(--f-mono);padding:2px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.frame{overflow-x:auto;border-radius:10px;border:1px solid var(--line);background:var(--surface)}
+.frame-note{font-size:13px;color:var(--muted);font-family:var(--f-mono)}
+.spec{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:var(--s5)}
+.spec > div{display:grid;gap:var(--s3);align-content:start;min-width:0}
+.sw{display:grid;grid-template-columns:28px 1fr auto;gap:var(--s2) var(--s3);align-items:center;font-size:14px}
+.sw i{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);display:block}
+.sw code{font-family:var(--f-mono);font-size:13px;color:var(--muted)}
+.sw b{font-family:var(--f-mono);font-weight:500;font-size:13px}
+ul.plain{margin:0;padding-left:1.1em;display:grid;gap:6px}
+.pc{display:grid;grid-template-columns:1fr 1fr;gap:var(--s4)}
+.pc h4{margin:0 0 6px;font-size:14px}
+.tbl{overflow-x:auto}
+table.cmp{border-collapse:collapse;width:100%;min-width:640px;font-size:15px}
+table.cmp th,table.cmp td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+table.cmp th{font-weight:600;color:var(--muted);font-size:13px;letter-spacing:.05em;text-transform:uppercase}
+.rec{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--mark);border-radius:8px;padding:var(--s5);display:grid;gap:var(--s3)}
+hr.sep{border:0;border-top:1px solid var(--line);margin:0}
+
+/* ===================== POS mock shared structure ===================== */
+.pos{width:100%;min-width:1180px;height:690px;display:grid;font-variant-numeric:tabular-nums;color:var(--p-ink);background:var(--p-bg);position:relative;overflow:hidden}
+.pos *{box-sizing:border-box}
+.pos .num{font-family:var(--p-num);font-variant-numeric:tabular-nums}
+.pos svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.pos table{border-collapse:collapse;width:100%}
+.pos .r{text-align:right}
+.pos .chip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;letter-spacing:.04em;padding:1px 6px;border-radius:var(--p-r-sm);white-space:nowrap}
+.pos .chip.scan2d{background:var(--p-info-bg);color:var(--p-info)}
+.pos .chip.fefo{background:var(--p-chipbg);color:var(--p-muted)}
+.pos .chip.near{background:var(--p-warn-bg);color:var(--p-warn)}
+.pos .chip.ok{background:var(--p-ok-bg);color:var(--p-ok)}
+.pos .dot{width:8px;height:8px;border-radius:50%;background:var(--p-ok);display:inline-block}
+
+/* ===================== A: Clear Dispensary ===================== */
+.pos-a{
+  --p-bg:#F5F8F8;--p-surface:#FFFFFF;--p-ink:#10262B;--p-muted:#4E6469;--p-line:#D5E0E1;--p-accent:#0B6E74;--p-on-accent:#FFFFFF;
+  --p-sel:#E3F1F1;--p-chipbg:#EDF2F2;--p-info:#0B5C8A;--p-info-bg:#E2F0F8;--p-warn:#8A5A00;--p-warn-bg:#FFF3D6;--p-ok:#1F7A3A;--p-ok-bg:#E7F4EA;--p-danger:#B42318;
+  --p-font:"Atkinson Hyperlegible","Segoe UI",Tahoma,sans-serif;--p-num:"IBM Plex Mono",Consolas,monospace;--p-r:6px;--p-r-sm:4px;
+  font-family:var(--p-font);font-size:14px;grid-template-columns:184px 1fr;grid-template-rows:56px 1fr 30px}
+.pos-a .nav{grid-row:1/4;background:var(--p-surface);border-right:1px solid var(--p-line);display:flex;flex-direction:column;padding:14px 10px;gap:2px}
+.pos-a .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;padding:4px 8px 16px;color:var(--p-accent)}
+.pos-a .brand .cross{width:22px;height:22px;border-radius:5px;background:var(--p-accent);position:relative}
+.pos-a .brand .cross::before,.pos-a .brand .cross::after{content:"";position:absolute;background:#FFFFFF;left:50%;top:50%;transform:translate(-50%,-50%)}
+.pos-a .brand .cross::before{width:12px;height:4px}.pos-a .brand .cross::after{width:4px;height:12px}
+.pos-a .nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--p-r);color:var(--p-muted);text-decoration:none;font-size:14px}
+.pos-a .nav a.on{background:var(--p-sel);color:var(--p-accent);font-weight:700}
+.pos-a .nav .grow{flex:1}
+.pos-a .top{display:flex;align-items:center;gap:20px;padding:0 20px;background:var(--p-surface);border-bottom:1px solid var(--p-line)}
+.pos-a .top .t{font-size:18px;font-weight:700}
+.pos-a .kv{display:flex;flex-direction:column;line-height:1.2}
+.pos-a .kv small{font-size:11px;color:var(--p-muted);text-transform:uppercase;letter-spacing:.06em}
+.pos-a .kv span{font-size:14px;font-weight:700}
+.pos-a .top .sp{flex:1}
+.pos-a .main{display:grid;grid-template-columns:1fr 336px;gap:16px;padding:16px 20px;min-height:0}
+.pos-a .left{display:grid;grid-template-rows:auto 1fr;gap:12px;min-height:0}
+.pos-a .scan{display:flex;align-items:center;gap:10px;background:var(--p-surface);border:2px solid var(--p-accent);border-radius:var(--p-r);padding:0 12px;height:48px;box-shadow:0 0 0 4px #0B6E741F}
+.pos-a .scan .ph{flex:1;font-size:16px;color:var(--p-muted)}
+.pos-a .scan kbd{font-family:var(--p-num);font-size:12px;border:1px solid var(--p-line);border-radius:4px;padding:1px 6px;color:var(--p-muted);background:var(--p-bg)}
+.pos-a .cart{background:var(--p-surface);border:1px solid var(--p-line);border-radius:var(--p-r);overflow:hidden}
+.pos-a .cart th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--p-muted);font-weight:700;padding:10px 12px;border-bottom:1px solid var(--p-line);text-align:left;background:var(--p-bg)}
+.pos-a .cart td{padding:9px 12px;border-bottom:1px solid var(--p-line);vertical-align:middle}
+.pos-a .cart tr.sel td{background:var(--p-sel)}
+.pos-a .cart tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--p-accent)}
+.pos-a .mn{font-weight:700;font-size:15px}
+.pos-a .ms{font-size:12px;color:var(--p-muted)}
+.pos-a .side{display:grid;grid-template-rows:auto 1fr auto;gap:12px;min-height:0}
+.pos-a .insp{background:var(--p-surface);border:1px solid var(--p-line);border-radius:var(--p-r);padding:14px;display:grid;gap:8px}
+.pos-a .insp h5{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--p-muted)}
+.pos-a .insp .row{display:flex;justify-content:space-between;font-size:13px}
+.pos-a .insp .row b{font-family:var(--p-num);font-weight:500}
+.pos-a .bar{height:6px;border-radius:3px;background:var(--p-chipbg);overflow:hidden}
+.pos-a .bar i{display:block;height:100%;width:13%;background:var(--p-warn)}
+.pos-a .sums{background:var(--p-surface);border:1px solid var(--p-line);border-radius:var(--p-r);padding:14px;display:grid;gap:6px;align-content:start}
+.pos-a .sums .row{display:flex;justify-content:space-between;font-size:14px}
+.pos-a .sums .row span:last-child{font-family:var(--p-num)}
+.pos-a .total{background:var(--p-accent);color:var(--p-on-accent);border-radius:var(--p-r);padding:14px 16px;display:grid;gap:2px}
+.pos-a .total small{font-size:12px;text-transform:uppercase;letter-spacing:.08em;opacity:.9}
+.pos-a .total .amt{font-family:var(--p-num);font-size:40px;font-weight:600;line-height:1.1}
+.pos-a .acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.pos-a .btn{border:1px solid var(--p-line);background:var(--p-surface);border-radius:var(--p-r);padding:8px;font:inherit;font-size:13px;font-weight:700;color:var(--p-ink);display:flex;justify-content:space-between;align-items:center}
+.pos-a .btn kbd{font-family:var(--p-num);font-size:11px;color:var(--p-muted)}
+.pos-a .btn.pri{grid-column:1/4;background:var(--p-ink);color:#FFFFFF;border-color:var(--p-ink);font-size:15px;padding:12px 14px}
+.pos-a .btn.pri kbd{color:#C8D6D8}
+.pos-a .status{grid-column:2;display:flex;align-items:center;gap:18px;padding:0 20px;font-size:12px;color:var(--p-muted);border-top:1px solid var(--p-line);background:var(--p-surface)}
+.pos-a .status .sp{flex:1}
+
+/* ===================== B: Night Counter ===================== */
+.pos-b{
+  --p-bg:#0E1416;--p-surface:#151D20;--p-raise:#1C272B;--p-ink:#E8EEF0;--p-muted:#9AABB0;--p-line:#2A373B;--p-accent:#5CC8D6;--p-on-accent:#0E1416;
+  --p-sel:#1F3438;--p-chipbg:#243034;--p-info:#7FC4FF;--p-info-bg:#16303F;--p-warn:#E8B04A;--p-warn-bg:#3A2E14;--p-ok:#5FC47F;--p-ok-bg:#163222;--p-danger:#FF7A6E;
+  --p-font:"Barlow","Segoe UI",sans-serif;--p-num:"JetBrains Mono",Consolas,monospace;--p-r:10px;--p-r-sm:6px;
+  font-family:var(--p-font);font-size:15px;grid-template-columns:64px 1fr 380px;grid-template-rows:72px 1fr 34px}
+.pos-b .rail{grid-row:1/4;background:var(--p-bg);border-right:1px solid var(--p-line);display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:10px}
+.pos-b .rail a{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;color:var(--p-muted)}
+.pos-b .rail a.on{background:var(--p-accent);color:var(--p-on-accent)}
+.pos-b .rail svg{width:20px;height:20px}
+.pos-b .scanbar{grid-column:2/4;display:flex;align-items:center;gap:16px;padding:0 20px;border-bottom:1px solid var(--p-line)}
+.pos-b .scan{flex:1;display:flex;align-items:center;gap:12px;height:48px;background:var(--p-raise);border-radius:var(--p-r);padding:0 16px;border:1px solid var(--p-accent)}
+.pos-b .scan .ph{flex:1;font-size:18px;color:var(--p-muted)}
+.pos-b .scan .caret{width:2px;height:24px;background:var(--p-accent)}
+.pos-b .who{display:flex;gap:16px;font-size:13px;color:var(--p-muted);white-space:nowrap}
+.pos-b .who b{color:var(--p-ink);font-weight:600}
+.pos-b .cart{padding:14px 20px;overflow:hidden}
+.pos-b .cart th{font-size:12px;color:var(--p-muted);font-weight:600;letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:0 10px 10px}
+.pos-b .cart td{padding:12px 10px;border-top:1px solid var(--p-line)}
+.pos-b .cart tr.sel td{background:var(--p-sel)}
+.pos-b .cart tr.sel td:first-child{border-radius:var(--p-r) 0 0 var(--p-r)}
+.pos-b .cart tr.sel td:last-child{border-radius:0 var(--p-r) var(--p-r) 0}
+.pos-b .mn{font-size:17px;font-weight:600}
+.pos-b .ms{font-size:13px;color:var(--p-muted)}
+.pos-b .qty{font-family:var(--p-num);font-size:18px;font-weight:700}
+.pos-b .amt{font-family:var(--p-num);font-size:17px;font-weight:600}
+.pos-b .pay{background:var(--p-surface);border-left:1px solid var(--p-line);padding:18px 20px;display:grid;grid-template-rows:auto auto 1fr auto;gap:14px}
+.pos-b .lbl{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--p-muted)}
+.pos-b .big{font-family:var(--p-num);font-size:64px;font-weight:700;line-height:1;letter-spacing:-.02em}
+.pos-b .big small{font-size:24px;color:var(--p-muted);font-weight:600;margin-right:6px}
+.pos-b .lines{display:grid;gap:6px;font-size:14px;color:var(--p-muted)}
+.pos-b .lines div{display:flex;justify-content:space-between}
+.pos-b .lines span:last-child{font-family:var(--p-num);color:var(--p-ink)}
+.pos-b .tenders{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start}
+.pos-b .tile{background:var(--p-raise);border:1px solid var(--p-line);border-radius:var(--p-r);padding:12px;display:grid;gap:2px}
+.pos-b .tile b{font-size:16px}
+.pos-b .tile span{font-size:12px;color:var(--p-muted)}
+.pos-b .tile.on{border-color:var(--p-accent);box-shadow:inset 0 0 0 1px var(--p-accent)}
+.pos-b .charge{background:var(--p-accent);color:var(--p-on-accent);border-radius:var(--p-r);padding:16px;display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:20px}
+.pos-b .charge kbd{font-family:var(--p-num);font-size:13px;background:#0E141633;padding:2px 8px;border-radius:6px}
+.pos-b .foot{grid-column:2/4;display:flex;align-items:center;gap:18px;padding:0 20px;font-size:12px;color:var(--p-muted);border-top:1px solid var(--p-line)}
+.pos-b .foot kbd{font-family:var(--p-num);color:var(--p-ink);margin-right:4px}
+.pos-b .foot .sp{flex:1}
+.pos-b .note{margin:10px 10px 0;padding:10px 12px;border-radius:var(--p-r);background:var(--p-warn-bg);color:var(--p-warn);font-size:13px;display:flex;gap:10px;align-items:center}
+
+/* ===================== C: Keyboard Ledger ===================== */
+.pos-c{
+  --p-bg:#EEF0F3;--p-surface:#FFFFFF;--p-ink:#1A1D24;--p-muted:#555B66;--p-line:#C9CED6;--p-accent:#3446B8;--p-band:#1F2A44;--p-hl:#FFF2A8;
+  --p-chipbg:#E6E9EE;--p-info:#1F4FA8;--p-info-bg:#E3EBFA;--p-warn:#7A4E00;--p-warn-bg:#FCEFC9;--p-ok:#1C6B33;--p-ok-bg:#E2F1E6;--p-danger:#A61B12;
+  --p-font:"IBM Plex Sans","Segoe UI",Tahoma,sans-serif;--p-num:"IBM Plex Mono",Consolas,monospace;--p-r:2px;--p-r-sm:2px;
+  font-family:var(--p-font);font-size:13px;grid-template-rows:26px 40px 1fr 92px 46px 24px}
+.pos-c .menu{display:flex;gap:2px;background:var(--p-surface);border-bottom:1px solid var(--p-line);padding:0 6px;align-items:center}
+.pos-c .menu span{padding:3px 10px}
+.pos-c .menu span u{text-decoration:underline}
+.pos-c .menu span.on{background:var(--p-accent);color:#FFFFFF}
+.pos-c .band{background:var(--p-band);color:#FFFFFF;display:flex;align-items:center;gap:22px;padding:0 12px}
+.pos-c .band .t{font-weight:700;font-size:14px;letter-spacing:.02em}
+.pos-c .band .f{display:flex;gap:6px;align-items:baseline;font-size:12px}
+.pos-c .band .f small{opacity:.75}
+.pos-c .band .f b{font-family:var(--p-num);font-weight:500;font-size:13px}
+.pos-c .band .sp{flex:1}
+.pos-c .grid{background:var(--p-surface);margin:6px 8px 0;border:1px solid var(--p-line);overflow:hidden;display:grid;grid-template-rows:auto 1fr}
+.pos-c .scanrow{display:grid;grid-template-columns:90px 1fr auto;align-items:center;border-bottom:1px solid var(--p-line);background:var(--p-bg)}
+.pos-c .scanrow label{font-weight:700;padding:6px 8px;font-size:12px}
+.pos-c .scanrow .in{background:var(--p-surface);border:2px solid var(--p-accent);height:28px;margin:4px 0;display:flex;align-items:center;padding:0 8px;color:var(--p-muted);font-family:var(--p-num)}
+.pos-c .scanrow .hint{padding:0 8px;font-size:12px;color:var(--p-muted)}
+.pos-c table th{background:var(--p-bg);font-weight:600;font-size:12px;text-align:left;padding:4px 8px;border-right:1px solid var(--p-line);border-bottom:1px solid var(--p-line)}
+.pos-c table td{padding:5px 8px;border-right:1px solid var(--p-line);border-bottom:1px solid var(--p-line);white-space:nowrap}
+.pos-c table td.num,.pos-c table td .num{font-family:var(--p-num)}
+.pos-c tr.sel td{background:var(--p-hl)}
+.pos-c .lower{display:grid;grid-template-columns:1fr 1fr 330px;gap:8px;margin:6px 8px 0}
+.pos-c .box{background:var(--p-surface);border:1px solid var(--p-line);padding:6px 8px;display:grid;gap:3px;align-content:start}
+.pos-c .box h5{margin:0 0 2px;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--p-muted)}
+.pos-c .box .row{display:flex;justify-content:space-between}
+.pos-c .box .row b{font-family:var(--p-num);font-weight:500}
+.pos-c .net{background:var(--p-band);color:#FFFFFF;border:0}
+.pos-c .net h5{color:#C9D2E6}
+.pos-c .net .row b{color:#FFFFFF}
+.pos-c .net .grand{font-family:var(--p-num);font-size:30px;font-weight:600;text-align:right;line-height:1.1}
+.pos-c .keys{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;margin:6px 8px}
+.pos-c .key{background:var(--p-surface);border:1px solid var(--p-line);border-bottom-width:3px;display:flex;flex-direction:column;justify-content:center;padding:2px 8px;line-height:1.2}
+.pos-c .key b{font-family:var(--p-num);font-size:12px;color:var(--p-accent)}
+.pos-c .key span{font-size:12px}
+.pos-c .key.go{background:var(--p-accent);border-color:#24318A;color:#FFFFFF}
+.pos-c .key.go b{color:#FFFFFF}
+.pos-c .status{display:flex;gap:16px;align-items:center;padding:0 10px;font-size:11px;background:var(--p-band);color:#DCE2EE}
+.pos-c .status .sp{flex:1}
+.pos-c .appr{display:flex;gap:6px;align-items:center;color:var(--p-warn);background:var(--p-warn-bg);padding:1px 6px;font-weight:600;font-size:12px}
+
+/* ===================== Receipt ===================== */
+.rc-wrap{display:grid;grid-template-columns:minmax(0,320px) minmax(0,1fr);gap:var(--s6);align-items:start}
+.receipt{background:#FFFFFF;color:#111111;width:100%;max-width:302px;padding:16px 14px 22px;font-family:"IBM Plex Mono",Consolas,monospace;font-size:12px;line-height:1.45;border:1px solid var(--line);box-shadow:0 10px 30px #0000001a}
+.receipt .c{text-align:center}
+.receipt .h{font-family:"Atkinson Hyperlegible",sans-serif;font-weight:700;font-size:16px}
+.receipt hr{border:0;border-top:1px dashed #555555;margin:8px 0}
+.receipt .l{display:flex;justify-content:space-between;gap:8px}
+.receipt .ur{direction:rtl;text-align:right;font-family:var(--urdu,"Noto Naskh Arabic"),serif;font-size:13px;line-height:1.9}
+.receipt .tot{font-size:15px;font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.seg button{font:inherit;font-size:14px;padding:6px 14px;background:transparent;color:var(--ink);border:0;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+@media (max-width:760px){
+  .rc-wrap{grid-template-columns:1fr}
+  .pc{grid-template-columns:1fr}
+  .dir-letter{font-size:40px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-dash" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+  <symbol id="i-pos" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></symbol>
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M2 6h12v10H2z"/><path d="M14 10h4l4 4v2h-8"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4h10a4 4 0 014 4v12H8a4 4 0 01-4-4z"/><path d="M8 8h6M8 12h6"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c1-4 4-6 7-6s6 2 7 6"/><path d="M16 4a3.5 3.5 0 010 7M18 14c2 1 3.5 3 4 6"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V4h3M18 4h3v3M21 17v3h-3M6 20H3v-3"/><path d="M7 8v8M10 8v8M13 8v8M17 8v8"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></symbol>
+</svg>
+
+<div class="wrap">
+
+<header class="intro">
+  <div class="eyebrow">MediCare Pharmacy · Phase 3 · Gate G4</div>
+  <h1>Three directions for the counter screen</h1>
+  <p>Each direction shows the same POS sale: five medicines, counter 3, the evening rush. Augmentin is selected because its batch expires in 47 days. Risek was picked by a 2D DataMatrix scan, and the rest by FEFO. Prices are illustrative. The directions differ in density, type, tone and how the keyboard is shown, not only in colour. All three are buildable with owner-drawn Windows Forms controls on both Windows 7 and Windows 10/11.</p>
+  <nav class="jump" aria-label="Jump to direction">
+    <a href="#dirA">A · Clear Dispensary</a>
+    <a href="#dirB">B · Night Counter</a>
+    <a href="#dirC">C · Keyboard Ledger</a>
+    <a href="#compare">Compare</a>
+    <a href="#receipt">Urdu receipt</a>
+  </nav>
+</header>
+
+<!-- ============================ A ============================ -->
+<section class="dir" id="dirA">
+  <div class="dir-head">
+    <div class="dir-letter">A</div>
+    <div class="meta">
+      <h2>Clear Dispensary</h2>
+      <div class="mood"><span>calm</span><span>clinical</span><span>legible</span></div>
+      <p>Suits mixed-age staff on long shifts in bright shops, and owners who want the app to look trustworthy at a glance.</p>
+    </div>
+  </div>
+
+  <div class="frame" role="img" aria-label="Direction A point-of-sale screen mock">
+  <div class="pos pos-a">
+    <aside class="nav">
+      <div class="brand"><span class="cross"></span>MediCare</div>
+      <a href="#dirA"><svg><use href="#i-dash"/></svg>Dashboard</a>
+      <a href="#dirA" class="on"><svg><use href="#i-pos"/></svg>POS / Sales</a>
+      <a href="#dirA"><svg><use href="#i-box"/></svg>Inventory</a>
+      <a href="#dirA"><svg><use href="#i-truck"/></svg>Purchases</a>
+      <a href="#dirA"><svg><use href="#i-book"/></svg>Accounts</a>
+      <a href="#dirA"><svg><use href="#i-chart"/></svg>Reports</a>
+      <a href="#dirA"><svg><use href="#i-users"/></svg>Customers</a>
+      <span class="grow"></span>
+      <a href="#dirA"><svg><use href="#i-gear"/></svg>Settings</a>
+    </aside>
+    <div class="top">
+      <div class="t">New sale</div>
+      <div class="kv"><small>Invoice</small><span class="num">SI-C3-261014-0482</span></div>
+      <div class="kv"><small>Customer</small><span>Walk-in</span></div>
+      <div class="kv"><small>Cashier</small><span>Asad · Counter 3</span></div>
+      <span class="sp"></span>
+      <span class="chip fefo">HELD 2</span>
+      <div class="kv"><small>14-Oct-2026</small><span class="num">19:42</span></div>
+    </div>
+    <div class="main">
+      <div class="left">
+        <div class="scan"><svg><use href="#i-scan"/></svg><span class="ph">Scan barcode or type medicine name</span><kbd>F2 search</kbd></div>
+        <div class="cart">
+          <table>
+            <thead><tr><th>Medicine</th><th>Batch · Expiry</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead>
+            <tbody>
+              <tr><td><div class="mn">Panadol 500 mg</div><div class="ms">Tablet · strip of 10 · GSK</div></td><td><span class="num">PN4417</span> · Jan-28 <span class="chip fefo">FEFO</span></td><td class="r num">2 strip</td><td class="r num">34.00</td><td class="r num">68.00</td></tr>
+              <tr class="sel"><td><div class="mn">Augmentin 625 mg</div><div class="ms">Tablet · strip of 6 · GSK</div></td><td><span class="num">AG2391</span> · Nov-26 <span class="chip near">47 DAYS</span></td><td class="r num">1 strip</td><td class="r num">412.00</td><td class="r num">412.00</td></tr>
+              <tr><td><div class="mn">Risek 20 mg</div><div class="ms">Capsule · strip of 14 · Getz</div></td><td><span class="num">RK0925</span> · Aug-27 <span class="chip scan2d">2D SCAN</span></td><td class="r num">1 strip</td><td class="r num">420.00</td><td class="r num">420.00</td></tr>
+              <tr><td><div class="mn">Brufen 400 mg</div><div class="ms">Tablet · loose · Abbott</div></td><td><span class="num">BF7710</span> · Mar-28 <span class="chip fefo">FEFO</span></td><td class="r num">10 tab</td><td class="r num">7.40</td><td class="r num">74.00</td></tr>
+              <tr><td><div class="mn">Calpol 120 mg/5 ml</div><div class="ms">Syrup · 120 ml bottle · GSK</div></td><td><span class="num">CP3302</span> · Jun-27 <span class="chip fefo">FEFO</span></td><td class="r num">1 btl</td><td class="r num">165.00</td><td class="r num">165.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="side">
+        <div class="insp">
+          <h5>Selected line · Augmentin 625 mg</h5>
+          <div class="row"><span>Batch picked (FEFO)</span><b>AG2391</b></div>
+          <div class="row"><span>Expires</span><b>30-Nov-2026</b></div>
+          <div class="bar" aria-hidden="true"><i></i></div>
+          <div class="row"><span>Rack</span><b>B-3, shelf 2</b></div>
+          <div class="row"><span>Available</span><b>34 strip</b></div>
+          <div class="row"><span>Next batch</span><b>AG2512 · May-27 · 62</b></div>
+        </div>
+        <div class="sums">
+          <div class="row"><span>Items</span><span>5 lines · 15 units</span></div>
+          <div class="row"><span>Gross</span><span>1,139.00</span></div>
+          <div class="row"><span>Discount (invoice)</span><span>− 39.00</span></div>
+          <div class="row"><span>Tax</span><span>0.00</span></div>
+        </div>
+        <div style="display:grid;gap:8px">
+          <div class="total"><small>Net payable</small><span class="amt">Rs 1,100.00</span></div>
+          <div class="acts">
+            <button class="btn" type="button" tabindex="-1">Customer <kbd>F3</kbd></button>
+            <button class="btn" type="button" tabindex="-1">Hold <kbd>F5</kbd></button>
+            <button class="btn" type="button" tabindex="-1">Discount <kbd>F6</kbd></button>
+            <button class="btn pri" type="button" tabindex="-1">Take payment <kbd>F4</kbd></button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="status"><span><span class="dot"></span> Connected to PHARM-HOST · 12 ms</span><span>Shift open since 09:00</span><span class="sp"></span><span>Backup 03:00 verified</span><span>Self-check passed</span></div>
+  </div>
+  </div>
+
+  <div class="spec">
+    <div>
+      <h3>Palette (contrast)</h3>
+      <div class="sw"><i style="background:#10262B"></i><span>Ink on canvas</span><b>14.7:1</b></div>
+      <div class="sw"><i style="background:#4E6469"></i><span>Muted on white</span><b>6.3:1</b></div>
+      <div class="sw"><i style="background:#0B6E74"></i><span>Dispensary teal, white on it</span><b>6.0:1</b></div>
+      <div class="sw"><i style="background:#FFF3D6"></i><span>Near-expiry amber text</span><b>5.4:1</b></div>
+      <div class="sw"><i style="background:#FDECEA"></i><span>Danger red text</span><b>5.8:1</b></div>
+    </div>
+    <div>
+      <h3>Type, shape, density</h3>
+      <ul class="plain">
+        <li><strong>Atkinson Hyperlegible</strong> for UI. It was designed for low-vision readers, and ambiguous glyphs (I/l/1, 0/O) are distinct.</li>
+        <li><strong>IBM Plex Mono</strong> for amounts, batches and invoice numbers.</li>
+        <li>6 px radius, 1 px borders, no shadows except the scan field's focus halo.</li>
+        <li>Medium density: 40 px rows; 13-15 px text; total at 40 px.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>References borrowed</h3>
+      <ul class="plain">
+        <li>Square POS: one dominant amount, receipt-like cart.</li>
+        <li>Fluent 2: desktop focus visuals and quiet surfaces.</li>
+        <li>Mint POS: expiry colour bands, here always paired with days left.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pc">
+    <div><h4>Strong at</h4><ul class="plain"><li>Readability across an 8-hour shift and on cheap 1366×768 screens.</li><li>Looks credible to owners and inspectors.</li><li>Easiest to theme for the A4 reports and receipts.</li></ul></div>
+    <div><h4>Costs</h4><ul class="plain"><li>Shows fewer lines than C before scrolling (about 9 vs 14 at 768 px).</li><li>Light surfaces need a separate dark theme later (tokens make it a palette swap).</li></ul></div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ============================ B ============================ -->
+<section class="dir" id="dirB">
+  <div class="dir-head">
+    <div class="dir-letter">B</div>
+    <div class="meta">
+      <h2>Night Counter</h2>
+      <div class="mood"><span>focused</span><span>bold</span><span>fast</span></div>
+      <p>Suits a counter-first shop that runs late into the night, with screens that face the cashier only and staff who live in the POS.</p>
+    </div>
+  </div>
+
+  <div class="frame" role="img" aria-label="Direction B point-of-sale screen mock">
+  <div class="pos pos-b">
+    <aside class="rail">
+      <a href="#dirB"><svg><use href="#i-dash"/></svg></a>
+      <a href="#dirB" class="on"><svg><use href="#i-pos"/></svg></a>
+      <a href="#dirB"><svg><use href="#i-box"/></svg></a>
+      <a href="#dirB"><svg><use href="#i-truck"/></svg></a>
+      <a href="#dirB"><svg><use href="#i-book"/></svg></a>
+      <a href="#dirB"><svg><use href="#i-chart"/></svg></a>
+    </aside>
+    <div class="scanbar">
+      <div class="scan"><svg><use href="#i-scan"/></svg><span class="caret"></span><span class="ph">Scan or type a medicine</span></div>
+      <div class="who"><span>Invoice <b class="num">SI-C3-261014-0482</b></span><span>Walk-in</span><span><b>Asad</b> · C3</span><span class="num">19:42</span></div>
+    </div>
+    <div class="cart">
+      <table>
+        <thead><tr><th>Medicine</th><th>Batch</th><th class="r">Qty</th><th class="r">Amount</th></tr></thead>
+        <tbody>
+          <tr><td><div class="mn">Panadol 500 mg</div><div class="ms">strip of 10 · Rs 34.00</div></td><td><span class="num">PN4417</span> <span class="ms">Jan-28</span></td><td class="r qty">2</td><td class="r amt">68.00</td></tr>
+          <tr class="sel"><td><div class="mn">Augmentin 625 mg</div><div class="ms">strip of 6 · Rs 412.00</div></td><td><span class="num">AG2391</span> <span class="chip near">47 d</span></td><td class="r qty">1</td><td class="r amt">412.00</td></tr>
+          <tr><td><div class="mn">Risek 20 mg</div><div class="ms">strip of 14 · Rs 420.00</div></td><td><span class="num">RK0925</span> <span class="chip scan2d">2D</span></td><td class="r qty">1</td><td class="r amt">420.00</td></tr>
+          <tr><td><div class="mn">Brufen 400 mg</div><div class="ms">loose tablet · Rs 7.40</div></td><td><span class="num">BF7710</span> <span class="ms">Mar-28</span></td><td class="r qty">10</td><td class="r amt">74.00</td></tr>
+          <tr><td><div class="mn">Calpol 120 mg/5 ml</div><div class="ms">120 ml bottle · Rs 165.00</div></td><td><span class="num">CP3302</span> <span class="ms">Jun-27</span></td><td class="r qty">1</td><td class="r amt">165.00</td></tr>
+        </tbody>
+      </table>
+      <div class="note"><svg><use href="#i-shield"/></svg>Augmentin AG2391 expires 30-Nov-2026 (47 days). Rack B-3. Next batch AG2512 (May-27).</div>
+    </div>
+    <div class="pay">
+      <div><div class="lbl">Net payable</div><div class="big"><small>Rs</small>1,100.00</div></div>
+      <div class="lines"><div><span>Gross · 5 lines</span><span>1,139.00</span></div><div><span>Discount</span><span>− 39.00</span></div><div><span>Tax</span><span>0.00</span></div></div>
+      <div class="tenders">
+        <div class="tile on"><b>Cash</b><span>Tendered 1,500 · change 400</span></div>
+        <div class="tile"><b>Card</b><span>Bank Alfalah POS</span></div>
+        <div class="tile"><b>Wallet</b><span>Easypaisa / JazzCash</span></div>
+        <div class="tile"><b>Credit</b><span>Pick customer F3</span></div>
+      </div>
+      <div class="charge">Complete sale <kbd>Enter</kbd></div>
+    </div>
+    <div class="foot"><span><kbd>F2</kbd>Search</span><span><kbd>F3</kbd>Customer</span><span><kbd>F4</kbd>Pay</span><span><kbd>F5</kbd>Hold</span><span><kbd>F6</kbd>Discount</span><span class="sp"></span><span><span class="dot"></span> PHARM-HOST 12 ms</span></div>
+  </div>
+  </div>
+
+  <div class="spec">
+    <div>
+      <h3>Palette (contrast)</h3>
+      <div class="sw"><i style="background:#151D20"></i><span>Ink on panel</span><b>14.6:1</b></div>
+      <div class="sw"><i style="background:#9AABB0"></i><span>Muted on panel</span><b>7.2:1</b></div>
+      <div class="sw"><i style="background:#5CC8D6"></i><span>Signal cyan on panel</span><b>8.7:1</b></div>
+      <div class="sw"><i style="background:#E8B04A"></i><span>Warning amber on panel</span><b>8.7:1</b></div>
+      <div class="sw"><i style="background:#FF7A6E"></i><span>Danger coral on panel</span><b>6.7:1</b></div>
+    </div>
+    <div>
+      <h3>Type, shape, density</h3>
+      <ul class="plain">
+        <li><strong>Barlow</strong> for UI: slightly narrow and road-sign plain, so it fits long medicine names at large sizes.</li>
+        <li><strong>JetBrains Mono</strong> for numerals; the total is 64 px and readable from 2 m.</li>
+        <li>10 px radius, tender tiles, icon-only rail.</li>
+        <li>Low density: 48 px rows; about 7 lines before scrolling.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>References borrowed</h3>
+      <ul class="plain">
+        <li>Odoo POS: tender tiles and visible change due.</li>
+        <li>Square: one "Complete sale" action.</li>
+        <li>Dark IDE themes: layered greys instead of pure black, to reduce glare.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pc">
+    <div><h4>Strong at</h4><ul class="plain"><li>Fastest to read the total and change due.</li><li>Feels modern and focused, with low glare at night.</li></ul></div>
+    <div><h4>Costs</h4><ul class="plain"><li>Dark greys crush on old TN panels common on Windows 7 PCs.</li><li>Back-office screens (ledgers, reports) are tiring in dark; you would maintain two themes from day one.</li><li>Fewer lines visible; big invoices scroll.</li></ul></div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ============================ C ============================ -->
+<section class="dir" id="dirC">
+  <div class="dir-head">
+    <div class="dir-letter">C</div>
+    <div class="meta">
+      <h2>Keyboard Ledger</h2>
+      <div class="mood"><span>dense</span><span>familiar</span><span>exact</span></div>
+      <p>Suits staff who already know Marg- or Tally-style software and work without the mouse, and shops that bill large prescriptions.</p>
+    </div>
+  </div>
+
+  <div class="frame" role="img" aria-label="Direction C point-of-sale screen mock">
+  <div class="pos pos-c">
+    <div class="menu"><span><u>D</u>ashboard</span><span class="on"><u>S</u>ales</span><span><u>I</u>nventory</span><span><u>P</u>urchases</span><span><u>A</u>ccounts</span><span><u>R</u>eports</span><span><u>C</u>ustomers</span><span>S<u>e</u>ttings</span></div>
+    <div class="band">
+      <span class="t">SALE INVOICE</span>
+      <span class="f"><small>No.</small><b>SI-C3-261014-0482</b></span>
+      <span class="f"><small>Date</small><b>14-10-2026 19:42</b></span>
+      <span class="f"><small>Party</small><b>WALK-IN</b></span>
+      <span class="f"><small>Cashier</small><b>ASAD / C3</b></span>
+      <span class="sp"></span>
+      <span class="f"><small>Held</small><b>2</b></span>
+    </div>
+    <div class="grid">
+      <div class="scanrow"><label for="cScan">Item / Code</label><div class="in" id="cScan">▌</div><span class="hint">Scan · or type 3 letters + Enter</span></div>
+      <table>
+        <thead><tr><th>#</th><th>Medicine</th><th>Pack</th><th>Batch</th><th>Expiry</th><th>Src</th><th>Rack</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Disc %</th><th class="r">Amount</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>PANADOL 500MG TAB</td><td>10's</td><td class="num">PN4417</td><td class="num">01/28</td><td><span class="chip fefo">FEFO</span></td><td>A-1</td><td class="r num">2 S</td><td class="r num">34.00</td><td class="r num">0</td><td class="r num">68.00</td></tr>
+          <tr class="sel"><td class="num">2</td><td>AUGMENTIN 625MG TAB</td><td>6's</td><td class="num">AG2391</td><td class="num">11/26</td><td><span class="chip near">47 D</span></td><td>B-3</td><td class="r num">1 S</td><td class="r num">412.00</td><td class="r num">0</td><td class="r num">412.00</td></tr>
+          <tr><td class="num">3</td><td>RISEK 20MG CAP</td><td>14's</td><td class="num">RK0925</td><td class="num">08/27</td><td><span class="chip scan2d">2D</span></td><td>C-5</td><td class="r num">1 S</td><td class="r num">420.00</td><td class="r num">0</td><td class="r num">420.00</td></tr>
+          <tr><td class="num">4</td><td>BRUFEN 400MG TAB</td><td>Loose</td><td class="num">BF7710</td><td class="num">03/28</td><td><span class="chip fefo">FEFO</span></td><td>A-4</td><td class="r num">10 T</td><td class="r num">7.40</td><td class="r num">0</td><td class="r num">74.00</td></tr>
+          <tr><td class="num">5</td><td>CALPOL 120MG/5ML SYP</td><td>120ml</td><td class="num">CP3302</td><td class="num">06/27</td><td><span class="chip fefo">FEFO</span></td><td>D-2</td><td class="r num">1 B</td><td class="r num">165.00</td><td class="r num">0</td><td class="r num">165.00</td></tr>
+          <tr><td class="num">6</td><td style="color:var(--p-muted)">—</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="lower">
+      <div class="box">
+        <h5>Batch · line 2</h5>
+        <div class="row"><span>AG2391 · exp 30-11-2026</span><b>34 S</b></div>
+        <div class="row"><span>AG2512 · exp 31-05-2027</span><b>62 S</b></div>
+        <div class="row"><span>Cost (avg) / margin</span><b>351.10 / 14.8%</b></div>
+      </div>
+      <div class="box">
+        <h5>Approvals</h5>
+        <div class="row"><span>Invoice discount Rs 39.00 (3.4%)</span><b>≤ 5% limit</b></div>
+        <div class="row"><span class="appr">Above 5% needs manager PIN</span><b></b></div>
+        <div class="row"><span>Customer credit</span><b>n/a</b></div>
+      </div>
+      <div class="box net">
+        <h5>Net payable</h5>
+        <div class="row"><span>Gross 1,139.00 · Disc 39.00 · Tax 0.00</span><b></b></div>
+        <div class="grand">Rs 1,100.00</div>
+      </div>
+    </div>
+    <div class="keys">
+      <div class="key"><b>F2</b><span>Find</span></div>
+      <div class="key"><b>F3</b><span>Party</span></div>
+      <div class="key go"><b>F4</b><span>Payment</span></div>
+      <div class="key"><b>F5</b><span>Hold/Recall</span></div>
+      <div class="key"><b>F6</b><span>Discount</span></div>
+      <div class="key"><b>F7</b><span>Batch</span></div>
+      <div class="key"><b>F8</b><span>Print</span></div>
+      <div class="key"><b>F9</b><span>Return</span></div>
+      <div class="key"><b>Del</b><span>Remove</span></div>
+      <div class="key"><b>Esc</b><span>Cancel</span></div>
+    </div>
+    <div class="status"><span>● PHARM-HOST 12 ms</span><span>Backup 03:00 OK</span><span>Self-check OK</span><span class="sp"></span><span>F1 Help</span></div>
+  </div>
+  </div>
+
+  <div class="spec">
+    <div>
+      <h3>Palette (contrast)</h3>
+      <div class="sw"><i style="background:#1A1D24"></i><span>Ink on white</span><b>16.9:1</b></div>
+      <div class="sw"><i style="background:#555B66"></i><span>Muted on canvas</span><b>6.0:1</b></div>
+      <div class="sw"><i style="background:#1F2A44"></i><span>Navy band, white on it</span><b>14.3:1</b></div>
+      <div class="sw"><i style="background:#3446B8"></i><span>Indigo accent, white on it</span><b>7.7:1</b></div>
+      <div class="sw"><i style="background:#FFF2A8"></i><span>Highlighter row, ink on it</span><b>14.9:1</b></div>
+    </div>
+    <div>
+      <h3>Type, shape, density</h3>
+      <ul class="plain">
+        <li><strong>IBM Plex Sans</strong> for UI, <strong>IBM Plex Mono</strong> for every figure: one family with two voices.</li>
+        <li>Square 2 px corners, full grid lines, keycap strip with real key names.</li>
+        <li>High density: 26 px rows; about 14 lines visible; 12-13 px text.</li>
+        <li>Alt-underlined menu mnemonics, like classic desktop software.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>References borrowed</h3>
+      <ul class="plain">
+        <li>Marg ERP / Tally: F-key muscle memory, party/voucher vocabulary.</li>
+        <li>Spreadsheet grids: column lines and a highlighter-yellow active row.</li>
+        <li>Pharmacy dispensing labels: uppercase item names, pack codes.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="pc">
+    <div><h4>Strong at</h4><ul class="plain"><li>Most information per screen; batch, rack, cost and margin all visible.</li><li>Zero retraining for staff coming from Marg-style tools.</li><li>Cheapest to build in WinForms (closest to native grid behaviour).</li></ul></div>
+    <div><h4>Costs</h4><ul class="plain"><li>Small text is harder for older staff and at 1366×768.</li><li>Looks dated to new hires; less forgiving for beginners.</li><li>Showing cost and margin on the counter screen needs a permission gate.</li></ul></div>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ============================ Compare ============================ -->
+<section class="dir" id="compare">
+  <div class="eyebrow">Side by side</div>
+  <h2>How they compare at this pharmacy</h2>
+  <div class="tbl">
+  <table class="cmp">
+    <thead><tr><th>Criterion</th><th>A · Clear Dispensary</th><th>B · Night Counter</th><th>C · Keyboard Ledger</th></tr></thead>
+    <tbody>
+      <tr><td>Lines visible at 1366×768</td><td>~9</td><td>~7</td><td>~14</td></tr>
+      <tr><td>Total readable from 2 m</td><td>Yes (40 px)</td><td>Best (64 px)</td><td>Yes (30 px)</td></tr>
+      <tr><td>Old Windows 7 TN monitors</td><td>Good</td><td>Weak (dark crush)</td><td>Good</td></tr>
+      <tr><td>8-hour readability, mixed ages</td><td>Best</td><td>Good at night</td><td>Weak for older eyes</td></tr>
+      <tr><td>Fits back-office screens and A4 reports</td><td>Best</td><td>Needs second theme</td><td>Good</td></tr>
+      <tr><td>Learning curve from Marg/Tally</td><td>Low (F-keys on buttons)</td><td>Medium</td><td>None</td></tr>
+      <tr><td>WinForms build effort</td><td>Medium</td><td>Medium-high</td><td>Low</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="rec">
+    <div class="eyebrow">Recommendation</div>
+    <h3 style="text-transform:none;letter-spacing:0;color:var(--ink);font-size:20px">A, with C's keycap strip and a density switch</h3>
+    <p>Use Clear Dispensary as the system: hyperlegible type, calm teal, light surfaces that suit both the counter and the back office. Borrow two things from Keyboard Ledger: the persistent F-key strip at the foot of the POS, and a per-user "Compact" density (32 px rows, about 12 lines) for staff who prefer more on screen. Keep B's 64 px total as a customer-facing second display later, if the shop adds pole displays. The choice is yours: pick A, B, C, or name a blend.</p>
+  </div>
+</section>
+
+<hr class="sep">
+
+<!-- ============================ Receipt ============================ -->
+<section class="dir" id="receipt">
+  <div class="eyebrow">Shared by every direction</div>
+  <h2>80 mm receipt with Urdu lines</h2>
+  <div class="rc-wrap">
+    <div class="receipt" id="rcpt">
+      <div class="c h">MediCare Pharmacy</div>
+      <div class="c">Shop 12, Main Boulevard, Lahore</div>
+      <div class="c">Tel 042-3500 0000 · DSL No. 01-352-0000</div>
+      <hr>
+      <div class="l"><span>SI-C3-261014-0482</span><span>14-10-26 19:42</span></div>
+      <div class="l"><span>Cashier: Asad (C3)</span><span>Walk-in</span></div>
+      <hr>
+      <div class="l"><span>Panadol 500mg 2 strip</span><span>68.00</span></div>
+      <div class="ur">پیناڈول ۵۰۰ ملی گرام</div>
+      <div class="l"><span>Augmentin 625mg 1 strip</span><span>412.00</span></div>
+      <div class="ur">آگمینٹن ۶۲۵ ملی گرام</div>
+      <div class="l"><span>Risek 20mg 1 strip</span><span>420.00</span></div>
+      <div class="l"><span>Brufen 400mg 10 tab</span><span>74.00</span></div>
+      <div class="ur">بروفین ۴۰۰ — کھانے کے بعد</div>
+      <div class="l"><span>Calpol syrup 120ml 1</span><span>165.00</span></div>
+      <hr>
+      <div class="l"><span>Gross</span><span>1,139.00</span></div>
+      <div class="l"><span>Discount</span><span>-39.00</span></div>
+      <div class="l tot"><span>NET Rs</span><span>1,100.00</span></div>
+      <div class="l"><span>Cash</span><span>1,500.00</span></div>
+      <div class="l"><span>Change</span><span>400.00</span></div>
+      <hr>
+      <div class="ur c" style="text-align:center">دوائی کی واپسی یا تبدیلی صرف بل کے ساتھ ۷ دن کے اندر</div>
+      <div class="ur c" style="text-align:center">فریج میں رکھی جانے والی ادویات واپس نہیں ہوں گی</div>
+      <div class="c" style="margin-top:6px">Batch and expiry printed on request · Thank you</div>
+    </div>
+    <div style="display:grid;gap:var(--s4);min-width:0">
+      <p>The receipt is the same in every direction. Urdu goes through the Windows printer driver as rendered text, because most thermal printers cannot shape Arabic script themselves. Two font options are under test for Windows 7 shaping:</p>
+      <div class="seg" role="group" aria-label="Urdu font on receipt">
+        <button type="button" id="fNaskh" aria-pressed="true">Naskh (safe default)</button>
+        <button type="button" id="fNast" aria-pressed="false">Nastaliq</button>
+      </div>
+      <ul class="plain">
+        <li>Naskh shapes reliably under Windows 7 text rendering and stays legible at 203 dpi.</li>
+        <li>Nastaliq is the traditional Urdu style, but it needs more line height and shapes less reliably on old systems. It is enabled only where the S00 spike passes.</li>
+        <li>Medicine names in Urdu are optional per medicine. The footer lines are set in Settings.</li>
+        <li>The licence number, address and phone shown here are placeholders for the owner to supply.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(function(){
+  var r=document.getElementById('rcpt'),a=document.getElementById('fNaskh'),b=document.getElementById('fNast');
+  function set(n){
+    r.style.setProperty('--urdu', n ? '"Noto Nastaliq Urdu"' : '"Noto Naskh Arabic"');
+    r.querySelectorAll('.ur').forEach(function(e){e.style.lineHeight = n ? '2.4' : '1.9';});
+    a.setAttribute('aria-pressed', String(!n)); b.setAttribute('aria-pressed', String(n));
+  }
+  a.addEventListener('click',function(){set(false)});
+  b.addEventListener('click',function(){set(true)});
+})();
+</script>

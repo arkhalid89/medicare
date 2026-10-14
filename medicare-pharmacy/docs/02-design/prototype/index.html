@@ -1,0 +1,637 @@
+<title>MediCare Pharmacy Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Naskh+Arabic:wght@400;600&display=swap">
+<link rel="stylesheet" href="../tokens.css">
+<style>
+/* Prototype only. Every colour, size and font comes from tokens.css. Layout: prototype control bar, then the app window (nav | header/content/status). */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--c-canvas);color:var(--c-ink);font-family:var(--f-ui);font-size:var(--t-md);line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:var(--s-3)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:var(--focus-width) solid var(--c-focus);outline-offset:2px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.r{text-align:right}
+.muted{color:var(--c-ink-muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* ---------- prototype controls ---------- */
+.proto{display:flex;flex-wrap:wrap;gap:var(--s-3) var(--s-5);align-items:center;margin:0 auto var(--s-3);max-width:1440px;font-size:var(--t-sm)}
+.proto b{font-size:var(--t-xs);letter-spacing:.06em;text-transform:uppercase;color:var(--c-ink-muted)}
+.proto label{display:flex;gap:var(--s-2);align-items:center}
+.proto select,.proto button{background:var(--c-surface);border:var(--border) solid var(--c-line-strong);border-radius:var(--r-md);padding:4px 8px;cursor:pointer}
+.proto button[aria-pressed="true"]{background:var(--c-ink);color:var(--c-surface);border-color:var(--c-ink)}
+.proto .demo{flex-basis:100%;color:var(--c-ink-muted)}
+.proto .demo .code{font-family:var(--f-num);background:var(--c-surface-alt);padding:1px 6px;border-radius:var(--r-sm);color:var(--c-ink);cursor:pointer;border:0}
+
+/* ---------- app window ---------- */
+.winwrap{overflow-x:auto;max-width:1440px;margin:0 auto;border:var(--border) solid var(--c-line);border-radius:8px;background:var(--c-surface)}
+.app{min-width:1240px;height:800px;display:grid;grid-template-columns:var(--nav-width) 1fr;grid-template-rows:var(--header-h) 1fr var(--status-h);position:relative;background:var(--c-canvas);overflow:hidden}
+.app.rail{grid-template-columns:var(--nav-rail) 1fr}
+.app.bare{grid-template-columns:1fr;grid-template-rows:1fr}
+.nav{grid-row:1/4;background:var(--c-surface);border-right:var(--border) solid var(--c-line);display:flex;flex-direction:column;padding:var(--s-3) var(--s-2);gap:2px;overflow-y:auto}
+.brand{display:flex;align-items:center;gap:var(--s-2);font-weight:var(--w-bold);font-size:var(--t-lg);color:var(--c-accent);padding:var(--s-1) var(--s-2) var(--s-3)}
+.cross{width:22px;height:22px;border-radius:5px;background:var(--c-accent);position:relative;flex:none}
+.cross::before,.cross::after{content:"";position:absolute;background:var(--c-on-accent);left:50%;top:50%;transform:translate(-50%,-50%)}
+.cross::before{width:12px;height:4px}.cross::after{width:4px;height:12px}
+.nav .grp{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--c-ink-muted);padding:var(--s-3) var(--s-2) var(--s-1)}
+.nav a{display:flex;align-items:center;gap:var(--s-2);padding:6px var(--s-2);border-radius:var(--r-md);color:var(--c-ink-muted);text-decoration:none;font-size:var(--t-md)}
+.nav a:hover{background:var(--c-surface-alt);color:var(--c-ink)}
+.nav a.on{background:var(--c-select);color:var(--c-accent);font-weight:var(--w-bold)}
+.nav .badge{margin-left:auto;font-family:var(--f-num);font-size:var(--t-xs);background:var(--c-warn-bg);color:var(--c-warn);border-radius:999px;padding:0 6px}
+.nav .grow{flex:1}
+.top{display:flex;align-items:center;gap:var(--s-5);padding:0 var(--s-5);background:var(--c-surface);border-bottom:var(--border) solid var(--c-line)}
+.top h1{font-size:var(--t-xl);margin:0}
+.kv{display:flex;flex-direction:column;line-height:1.2}
+.kv small{font-size:var(--t-xs);color:var(--c-ink-muted);text-transform:uppercase;letter-spacing:.06em}
+.kv span{font-weight:var(--w-bold)}
+.top .sp{flex:1}
+.user{display:flex;align-items:center;gap:var(--s-2)}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--c-surface-alt);display:grid;place-items:center;font-weight:var(--w-bold);font-size:var(--t-sm)}
+.main{overflow:auto;padding:var(--s-4) var(--s-5);position:relative;min-height:0}
+.app.pos .main{padding:0;display:grid;grid-template-rows:1fr var(--fkey-h)}
+.status{grid-column:2;display:flex;align-items:center;gap:var(--s-5);padding:0 var(--s-5);font-size:var(--t-sm);color:var(--c-ink-muted);background:var(--c-surface);border-top:var(--border) solid var(--c-line)}
+.status .sp{flex:1}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--c-ok);display:inline-block;margin-right:6px}
+.status.down{background:var(--c-danger-bg);color:var(--c-danger);font-weight:var(--w-bold)}
+.status.down .dot{background:var(--c-danger)}
+
+/* ---------- primitives ---------- */
+.row{display:flex;gap:var(--s-3);align-items:center;flex-wrap:wrap}
+.stack{display:grid;gap:var(--s-3);align-content:start}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--s-4)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--s-4)}
+.split{display:grid;grid-template-columns:1fr 360px;gap:var(--s-4);align-items:start}
+.panel{background:var(--c-surface);border:var(--border) solid var(--c-line);border-radius:var(--r-md);padding:var(--s-4);display:grid;gap:var(--s-3);align-content:start;min-width:0}
+.panel h2{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--c-ink-muted);margin:0}
+.panel h3{font-size:var(--t-lg);margin:0}
+.btn{height:var(--control-h);padding:0 var(--s-3);border-radius:var(--r-md);border:var(--border) solid var(--c-line-strong);background:var(--c-surface);cursor:pointer;display:inline-flex;align-items:center;gap:var(--s-2);font-weight:var(--w-bold);white-space:nowrap}
+.btn:hover{background:var(--c-surface-alt)}
+.btn kbd{font-family:var(--f-num);font-size:var(--t-xs);color:var(--c-ink-muted);font-weight:var(--w-regular)}
+.btn.pri{background:var(--c-primary-action);color:var(--c-on-primary);border-color:var(--c-primary-action);height:var(--control-h-lg)}
+.btn.pri kbd{color:inherit;opacity:.8}
+.btn.acc{background:var(--c-accent);color:var(--c-on-accent);border-color:var(--c-accent)}
+.btn.acc:hover{background:var(--c-accent-hover)}
+.btn.danger{color:var(--c-danger);border-color:var(--c-danger)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.field{display:grid;gap:4px;min-width:0}
+.field label{font-size:var(--t-sm);font-weight:var(--w-bold)}
+.field .hint{font-size:var(--t-sm);color:var(--c-ink-muted)}
+.field .err{font-size:var(--t-sm);color:var(--c-danger)}
+.in{height:var(--control-h);border:var(--border) solid var(--c-line-strong);border-radius:var(--r-md);background:var(--c-surface);padding:0 var(--s-2);width:100%}
+.in:focus{outline:none;border:2px solid var(--c-focus);box-shadow:0 0 0 4px color-mix(in srgb,var(--c-focus) 14%,transparent)}
+.in.bad{border-color:var(--c-danger)}
+.in.n{text-align:right;font-family:var(--f-num)}
+select.in{padding-right:var(--s-1)}
+.chip{display:inline-flex;align-items:center;font-size:var(--t-xs);font-weight:var(--w-bold);letter-spacing:.04em;padding:1px 6px;border-radius:var(--r-sm);white-space:nowrap;background:var(--c-surface-alt);color:var(--c-ink-muted)}
+.chip.ok{background:var(--c-ok-bg);color:var(--c-ok)}.chip.warn{background:var(--c-warn-bg);color:var(--c-warn)}
+.chip.danger{background:var(--c-danger-bg);color:var(--c-danger)}.chip.info{background:var(--c-info-bg);color:var(--c-info)}
+.chip.acc{background:var(--c-select);color:var(--c-accent)}
+.banner{display:flex;gap:var(--s-3);align-items:center;padding:var(--s-2) var(--s-3);border-radius:var(--r-md);font-weight:var(--w-bold)}
+.banner.ok{background:var(--c-ok-bg);color:var(--c-ok)}.banner.warn{background:var(--c-warn-bg);color:var(--c-warn)}
+.banner.danger{background:var(--c-danger-bg);color:var(--c-danger)}.banner.info{background:var(--c-info-bg);color:var(--c-info)}
+.banner .sp{flex:1}
+.tabs{display:flex;gap:2px;border-bottom:var(--border) solid var(--c-line)}
+.tabs button{border:0;background:transparent;padding:var(--s-2) var(--s-3);cursor:pointer;color:var(--c-ink-muted);border-bottom:2px solid transparent;font-weight:var(--w-bold)}
+.tabs button.on{color:var(--c-accent);border-bottom-color:var(--c-accent)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--s-3)}
+.kpi{background:var(--c-surface);border:var(--border) solid var(--c-line);border-radius:var(--r-md);padding:var(--s-3) var(--s-4);display:grid;gap:2px;min-width:0}
+.kpi small{font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--c-ink-muted)}
+.kpi .v{font-family:var(--f-num);font-size:var(--t-2xl);font-weight:600;line-height:1.2}
+.kpi .s{font-size:var(--t-sm);color:var(--c-ink-muted)}
+.kpi.warn{border-color:var(--c-warn)}.kpi.danger{border-color:var(--c-danger)}
+.empty{display:grid;place-items:center;text-align:center;gap:var(--s-3);padding:var(--s-8);color:var(--c-ink-muted)}
+.empty h3{color:var(--c-ink);margin:0;font-size:var(--t-lg)}
+.skel{height:14px;border-radius:var(--r-sm);background:linear-gradient(90deg,var(--c-surface-alt),var(--c-line),var(--c-surface-alt));background-size:200% 100%;animation:sh 1.2s infinite linear}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+
+/* ---------- grid ---------- */
+.tbl{background:var(--c-surface);border:var(--border) solid var(--c-line);border-radius:var(--r-md);overflow:auto}
+table.g{border-collapse:collapse;width:100%}
+table.g th{position:sticky;top:0;background:var(--c-surface-alt);font-size:var(--t-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--c-ink-muted);text-align:left;padding:var(--s-2) var(--s-3);border-bottom:var(--border) solid var(--c-line);white-space:nowrap}
+table.g td{padding:0 var(--s-3);height:var(--row-h);border-bottom:var(--border) solid var(--c-line);white-space:nowrap}
+table.g td.wrap{white-space:normal}
+table.g tr.sel td{background:var(--c-select)}
+table.g tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--c-accent)}
+table.g tr.click{cursor:pointer}
+table.g tr.click:hover td{background:var(--c-surface-alt)}
+table.g th.r,table.g td.r{text-align:right}
+table.g tfoot td{font-weight:var(--w-bold);background:var(--c-surface-alt)}
+.mn{font-weight:var(--w-bold);font-size:var(--t-lg)}
+.ms{font-size:var(--t-sm);color:var(--c-ink-muted)}
+.ledger td.neg{color:var(--c-danger)}
+
+/* ---------- POS ---------- */
+.posbody{display:grid;grid-template-columns:1fr 336px;gap:var(--s-4);padding:var(--s-4) var(--s-5);min-height:0}
+.posleft{display:grid;grid-template-rows:auto auto 1fr;gap:var(--s-3);min-height:0}
+.scan{display:flex;align-items:center;gap:var(--s-2);background:var(--c-surface);border:2px solid var(--c-focus);border-radius:var(--r-md);padding:0 var(--s-3);height:48px;box-shadow:0 0 0 4px color-mix(in srgb,var(--c-focus) 12%,transparent)}
+.scan input{flex:1;border:0;background:transparent;font-size:16px;outline:none;height:100%}
+.scan kbd{font-family:var(--f-num);font-size:var(--t-xs);border:var(--border) solid var(--c-line);border-radius:var(--r-sm);padding:1px 6px;color:var(--c-ink-muted)}
+.scanmsg{min-height:22px;font-size:var(--t-sm)}
+.posside{display:flex;flex-direction:column;justify-content:space-between;gap:var(--s-2);min-height:0}
+.posside .panel{padding:var(--s-3);gap:var(--s-2)}
+.insp .rw,.sums .rw{display:flex;justify-content:space-between;font-size:var(--t-md)}
+.insp .rw b,.sums .rw span:last-child{font-family:var(--f-num);font-weight:500}
+.bar{height:6px;border-radius:3px;background:var(--c-surface-alt);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--c-warn)}
+.total{background:var(--c-accent);color:var(--c-on-accent);border-radius:var(--r-md);padding:var(--s-3) var(--s-4);display:grid}
+.total small{font-size:var(--t-sm);text-transform:uppercase;letter-spacing:.08em}
+.total .amt{font-family:var(--f-num);font-size:var(--t-total);font-weight:600;line-height:1.1}
+.acts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--s-2)}
+.acts .btn{justify-content:space-between;padding:0 var(--s-2);font-size:var(--t-sm)}
+.acts .btn.pri{grid-column:1/4;font-size:var(--t-lg)}
+.keys{display:grid;grid-template-columns:repeat(10,1fr);gap:var(--s-2);padding:var(--s-1) var(--s-5) var(--s-2);background:var(--c-canvas)}
+.key{background:var(--c-surface);border:var(--border) solid var(--c-line-strong);border-bottom-width:3px;border-radius:var(--r-sm);display:flex;flex-direction:column;justify-content:center;padding:0 var(--s-2);line-height:1.15;cursor:pointer;text-align:left}
+.key b{font-family:var(--f-num);font-size:var(--t-sm);color:var(--c-accent)}
+.key span{font-size:var(--t-sm)}
+.key.go{background:var(--c-accent);border-color:var(--c-accent-hover);color:var(--c-on-accent)}
+.key.go b{color:var(--c-on-accent)}
+
+/* ---------- dialogs ---------- */
+.scrim{position:absolute;inset:0;background:color-mix(in srgb,var(--c-ink) 40%,transparent);display:grid;place-items:center;z-index:20}
+.dlg{background:var(--c-surface);border-radius:var(--r-md);box-shadow:var(--elev-dialog);width:min(560px,92%);max-height:92%;overflow:auto;display:grid;gap:var(--s-4);padding:var(--s-5)}
+.dlg.wide{width:min(760px,94%)}
+.dlg h2{margin:0;font-size:var(--t-xl)}
+.dlg .foot{display:flex;justify-content:flex-end;gap:var(--s-2)}
+.tender{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--s-2)}
+.tender button{height:52px;border:var(--border) solid var(--c-line-strong);background:var(--c-surface);border-radius:var(--r-md);cursor:pointer;display:grid;place-items:center;font-weight:var(--w-bold);line-height:1.1}
+.tender button small{font-family:var(--f-num);font-size:var(--t-xs);color:var(--c-ink-muted);font-weight:var(--w-regular)}
+.tender button.on{border:2px solid var(--c-accent);background:var(--c-select);color:var(--c-accent)}
+.bigline{display:flex;justify-content:space-between;align-items:baseline;font-size:var(--t-lg)}
+.bigline b{font-family:var(--f-num);font-size:var(--t-2xl)}
+.toast{position:absolute;right:var(--s-5);bottom:calc(var(--status-h) + var(--s-4));z-index:30;max-width:420px}
+.toast .banner{box-shadow:var(--elev-dialog)}
+.steps{display:flex;gap:var(--s-2);flex-wrap:wrap}
+.steps span{padding:4px 10px;border-radius:999px;background:var(--c-surface-alt);font-size:var(--t-sm);color:var(--c-ink-muted)}
+.steps span.on{background:var(--c-accent);color:var(--c-on-accent);font-weight:var(--w-bold)}
+.steps span.done{background:var(--c-ok-bg);color:var(--c-ok)}
+.login{display:grid;grid-template-columns:1.1fr 1fr;height:100%}
+.login .art{background:var(--c-accent);color:var(--c-on-accent);padding:var(--s-8);display:grid;align-content:space-between}
+.login .art h1{font-size:34px;margin:0;max-width:16ch;line-height:1.15}
+.login .form{display:grid;place-items:center;padding:var(--s-8)}
+.login .form .panel{width:360px;padding:var(--s-6)}
+.prog{height:10px;border-radius:5px;background:var(--c-surface-alt);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--c-accent);width:0;transition:width var(--m-base) var(--ease)}
+.chk{display:flex;gap:var(--s-2);align-items:center}
+.matrix td{text-align:center}
+.matrix td:first-child{text-align:left}
+.receipt{background:var(--c-surface);border:var(--border) dashed var(--c-line-strong);padding:var(--s-3);font-family:var(--f-num);font-size:var(--t-sm);max-width:300px}
+.receipt .ur{direction:rtl;text-align:right;font-family:var(--f-urdu);line-height:1.9}
+.receipt .l{display:flex;justify-content:space-between}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--c-ink-muted);font-family:var(--f-num);font-size:10px}
+</style>
+
+<div class="proto" aria-label="Prototype controls">
+  <b>Prototype</b>
+  <label for="pScreen">Screen <select id="pScreen"></select></label>
+  <label for="pRole">Role <select id="pRole">
+    <option value="admin">Administrator (Rehan)</option>
+    <option value="manager">Pharmacist / Manager (Sana)</option>
+    <option value="cashier" selected>Cashier (Asad)</option>
+    <option value="stock">Stock operator (Imran)</option>
+    <option value="accountant">Accountant (Faraz)</option>
+  </select></label>
+  <label for="pState">State <select id="pState">
+    <option value="normal">Normal</option><option value="empty">Empty</option><option value="loading">Loading</option><option value="error">Error</option><option value="success">Success</option>
+  </select></label>
+  <button type="button" id="pHost" aria-pressed="false">Simulate host down</button>
+  <button type="button" id="pDensity" aria-pressed="false">Compact density</button>
+  <button type="button" id="pTheme" aria-pressed="false">Dark theme</button>
+  <div class="demo">POS demo scans (click to scan): <button class="code" data-scan="8964000101011">8964000101011</button> Panadol (FEFO) · <button class="code" data-scan="01089640002020281727083110RK0925|21A7Q2K9">GS1 2D Risek</button> · <button class="code" data-scan="8964000303035">8964000303035</button> Brufen · <button class="code" data-scan="8964000999990">8964000999990</button> expired · <button class="code" data-scan="8961234567890">8961234567890</button> unknown. Type <code>*3</code> + Enter to set quantity.</div>
+</div>
+
+<div class="winwrap"><div class="app" id="app"></div></div>
+
+<script>
+(function(){
+"use strict";
+/* ================= data ================= */
+var ROLES={admin:"Rehan",manager:"Sana",cashier:"Asad",stock:"Imran",accountant:"Faraz"};
+var ROLE_LABEL={admin:"Administrator",manager:"Pharmacist / Manager",cashier:"Cashier",stock:"Stock operator",accountant:"Accountant"};
+var DISC_LIMIT={admin:100,manager:10,cashier:5,stock:0,accountant:0};
+var MEDS=[
+ {id:"M-00412",code:"8964000101011",name:"Panadol 500 mg",generic:"Paracetamol",form:"Tablet",pack:"strip of 10",mfr:"GSK",unit:"strip",rate:34.00,batch:"PN4417",exp:"Jan-28",days:473,rack:"A-1",avail:"212 strip",stock:2120,min:400,status:"Active",ur:"پیناڈول ۵۰۰"},
+ {id:"M-00087",code:"8964000404042",name:"Augmentin 625 mg",generic:"Co-amoxiclav",form:"Tablet",pack:"strip of 6",mfr:"GSK",unit:"strip",rate:412.00,batch:"AG2391",exp:"Nov-26",days:47,rack:"B-3",avail:"34 strip",stock:576,min:120,status:"Active",ur:"آگمینٹن ۶۲۵"},
+ {id:"M-01120",code:"8964000202028",name:"Risek 20 mg",generic:"Omeprazole",form:"Capsule",pack:"strip of 14",mfr:"Getz Pharma",unit:"strip",rate:420.00,batch:"RK0925",exp:"Aug-27",days:321,rack:"C-5",avail:"48 strip",stock:672,min:140,status:"Active",ur:"رائزیک ۲۰"},
+ {id:"M-00233",code:"8964000303035",name:"Brufen 400 mg",generic:"Ibuprofen",form:"Tablet",pack:"loose",mfr:"Abbott",unit:"tab",rate:7.40,batch:"BF7710",exp:"Mar-28",days:533,rack:"A-4",avail:"1,860 tab",stock:1860,min:500,status:"Active",ur:"بروفین ۴۰۰"},
+ {id:"M-00516",code:"8964000505059",name:"Calpol 120 mg/5 ml",generic:"Paracetamol",form:"Syrup",pack:"120 ml bottle",mfr:"GSK",unit:"btl",rate:165.00,batch:"CP3302",exp:"Jun-27",days:259,rack:"D-2",avail:"41 btl",stock:41,min:30,status:"Active",ur:"کالپول سیرپ"},
+ {id:"M-00771",code:"8964000606066",name:"Arinac Forte",generic:"Ibuprofen + Pseudoephedrine",form:"Tablet",pack:"strip of 10",mfr:"Abbott",unit:"strip",rate:96.00,batch:"AR5521",exp:"Feb-27",days:139,rack:"A-6",avail:"9 strip",stock:90,min:200,status:"Active",ur:""},
+ {id:"M-00902",code:"8964000707073",name:"Ponstan 500 mg",generic:"Mefenamic acid",form:"Tablet",pack:"strip of 10",mfr:"Pfizer",unit:"strip",rate:88.00,batch:"PS2210",exp:"Dec-27",days:442,rack:"A-2",avail:"64 strip",stock:640,min:150,status:"Active",ur:""},
+ {id:"M-01344",code:"8964000999990",name:"Flagyl 400 mg",generic:"Metronidazole",form:"Tablet",pack:"strip of 10",mfr:"Sanofi",unit:"strip",rate:52.00,batch:"FL1180",exp:"Aug-26",days:-44,rack:"B-1",avail:"0 saleable",stock:0,min:100,status:"Active",ur:""},
+ {id:"M-01502",code:"8964000808080",name:"Xanax 0.5 mg",generic:"Alprazolam",form:"Tablet",pack:"strip of 10",mfr:"Pfizer",unit:"strip",rate:118.00,batch:"XN0412",exp:"Apr-27",days:198,rack:"Locked L-1",avail:"22 strip",stock:220,min:40,status:"Active",ur:"",sched:"B"},
+ {id:"M-00045",code:"8964000111110",name:"Disprin 300 mg",generic:"Aspirin",form:"Tablet",pack:"strip of 10",mfr:"Reckitt",unit:"strip",rate:24.00,batch:"DS9081",exp:"Sep-27",days:351,rack:"A-3",avail:"0 strip",stock:0,min:100,status:"Inactive",ur:""}
+];
+function med(code){for(var i=0;i<MEDS.length;i++)if(MEDS[i].code===code)return MEDS[i];return null}
+var BASECART=[
+ {m:"8964000101011",qty:2,src:"FEFO"},{m:"8964000404042",qty:1,src:"FEFO"},{m:"8964000202028",qty:1,src:"2D"},{m:"8964000303035",qty:10,src:"FEFO"},{m:"8964000505059",qty:1,src:"FEFO"}];
+var S={screen:"SCR-04",role:"cashier",state:"normal",host:true,cart:[],sel:1,disc:39,invNo:482,toast:null,dlg:null,tab:{},importStep:2,pay:"cash",tendered:"1500"};
+function resetCart(){S.cart=BASECART.map(function(x){return{m:x.m,qty:x.qty,src:x.src}});S.sel=1;S.disc=39}
+resetCart();
+
+/* ================= helpers ================= */
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function money(n){var neg=n<0;n=Math.abs(n);var p=n.toFixed(2).split(".");p[0]=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,",");return(neg?"− ":"")+p.join(".")}
+function chip(t,k){return '<span class="chip '+(k||"")+'">'+esc(t)+'</span>'}
+function table(cols,rows,o){o=o||{};var h='<div class="tbl"'+(o.h?' style="max-height:'+o.h+'px"':'')+'><table class="g '+(o.cls||"")+'"><thead><tr>';
+ cols.forEach(function(c){h+='<th class="'+(c.n?"r":"")+'">'+c.l+'</th>'});h+='</tr></thead><tbody>';
+ rows.forEach(function(r,i){h+='<tr class="'+(o.sel===i?"sel ":"")+(o.click?"click":"")+'"'+(o.click?' data-act="'+o.click+'" data-i="'+i+'"':'')+'>';cols.forEach(function(c){var v=c.f?c.f(r,i):r[c.k];h+='<td class="'+(c.n?"r num":"")+(c.w?" wrap":"")+'">'+(v==null?"":v)+'</td>'});h+='</tr>'});
+ h+='</tbody>'+(o.foot?'<tfoot><tr>'+o.foot.map(function(f,i){return'<td class="'+(cols[i]&&cols[i].n?"r num":"")+'">'+f+'</td>'}).join("")+'</tr></tfoot>':'')+'</table></div>';return h}
+function field(id,label,val,o){o=o||{};var inp=o.sel?'<select class="in" id="'+id+'">'+o.sel.map(function(x){return'<option'+(x===val?' selected':'')+'>'+esc(x)+'</option>'}).join("")+'</select>':'<input class="in'+(o.n?" n":"")+(o.err?" bad":"")+'" id="'+id+'" value="'+esc(val==null?"":val)+'"'+(o.type?' type="'+o.type+'"':'')+(o.ph?' placeholder="'+esc(o.ph)+'"':'')+(o.ro?' readonly':'')+'>';
+ return '<div class="field"'+(o.span?' style="grid-column:span '+o.span+'"':'')+'><label for="'+id+'">'+esc(label)+'</label>'+inp+(o.err?'<span class="err">'+esc(o.err)+'</span>':o.hint?'<span class="hint">'+esc(o.hint)+'</span>':'')+'</div>'}
+function kpi(l,v,s,k){return '<div class="kpi '+(k||"")+'"><small>'+l+'</small><span class="v">'+v+'</span><span class="s">'+s+'</span></div>'}
+function tabs(key,list){var cur=S.tab[key]||list[0];return '<div class="tabs" role="tablist">'+list.map(function(t){return'<button type="button" role="tab" aria-selected="'+(t===cur)+'" class="'+(t===cur?"on":"")+'" data-tab="'+key+'" data-v="'+esc(t)+'">'+esc(t)+'</button>'}).join("")+'</div>'}
+function cur(key,def){return S.tab[key]||def}
+function bars(vals,labels){var W=640,H=180,pad=28,max=600000,bw=(W-pad*2)/vals.length;var s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Daily net sales, last 14 days">';
+ [0,200000,400000,600000].forEach(function(t){var y=H-20-(t/max)*(H-40);s+='<line x1="'+pad+'" x2="'+(W-6)+'" y1="'+y+'" y2="'+y+'" stroke="var(--c-line)" stroke-width="1"/><text x="2" y="'+(y+3)+'">'+(t/1000)+'k</text>'});
+ vals.forEach(function(v,i){var h=(v/max)*(H-40),x=pad+i*bw+3,y=H-20-h;s+='<rect x="'+x+'" y="'+y+'" width="'+(bw-6)+'" height="'+h+'" rx="2" fill="'+(i===vals.length-1?"var(--c-accent)":"var(--c-select)")+'" stroke="var(--c-accent)" stroke-width="'+(i===vals.length-1?0:1)+'"/>';if(i%2===1||i===vals.length-1)s+='<text x="'+(x+(bw-6)/2)+'" y="'+(H-6)+'" text-anchor="middle">'+labels[i]+'</text>'});
+ return s+'</svg>'}
+function donut(parts){var C=2*Math.PI*44,off=0,s='<svg class="chart" viewBox="0 0 240 120" role="img" aria-label="Sales by payment method">';var cols=["var(--c-accent)","var(--c-info)","var(--c-warn)","var(--c-ink-muted)"];
+ parts.forEach(function(p,i){var len=C*p[1]/100;s+='<circle cx="60" cy="60" r="44" fill="none" stroke="'+cols[i]+'" stroke-width="18" stroke-dasharray="'+len+' '+(C-len)+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 60 60)"/>';off+=len;
+  s+='<rect x="130" y="'+(18+i*24)+'" width="10" height="10" rx="2" fill="'+cols[i]+'"/><text x="146" y="'+(27+i*24)+'" style="fill:var(--c-ink);font-size:12px">'+p[0]+' '+p[1]+'%</text>'});return s+'</svg>'}
+
+/* ================= POS logic ================= */
+function lines(){return S.cart.map(function(c){var m=med(c.m);return{m:m,qty:c.qty,src:c.src,amt:Math.round(c.qty*m.rate*100)/100}})}
+function totals(){var L=lines(),g=0,u=0;L.forEach(function(l){g+=l.amt;u+=l.qty});var net=Math.max(0,g-S.disc);return{gross:g,units:u,lines:L.length,disc:S.disc,net:net}}
+function gs1(s){s=s.replace(/^\]d2/,"").replace(/\u200b/g,"");var o={};if(s.charAt(0)==="("){var re=/\((\d{2})\)([^(]+)/g,m;while((m=re.exec(s)))o[m[1]]=m[2];return o.hasOwnProperty("01")?o:null}
+ if(s.slice(0,2)!=="01"||s.length<18)return null;o["01"]=s.slice(2,16);var i=16;while(i<s.length){var ai=s.slice(i,i+2);i+=2;if(ai==="17"||ai==="11"){o[ai]=s.slice(i,i+6);i+=6}else{var j=s.indexOf("|",i);if(j<0)j=s.length;o[ai]=s.slice(i,j);i=j+1}}return o}
+function scan(raw){raw=raw.trim();if(!raw)return;var msg=document.getElementById("scanmsg");
+ if(/^[*+]\d+$/.test(raw)){var q=parseInt(raw.slice(1),10);if(S.cart[S.sel]){S.cart[S.sel].qty=q;render();say("Quantity set to "+q+".","ok")}return}
+ if(S.cart.length>=0&&!S.host){openDlg("hostdown");return}
+ var g=gs1(raw),code=g?g["01"].replace(/^0/,""):raw,m=med(code);
+ if(!m){say("Barcode "+raw.slice(0,16)+" was not found. Press F2 to search by name, or ask a manager to add the barcode.","danger");return}
+ if(m.status==="Inactive"){say(m.name+" is inactive and cannot be sold.","danger");return}
+ if(m.days<0){say("Batch "+m.batch+" of "+m.name+" expired 31-Aug-2026. Expired stock cannot be sold. Move it to quarantine.","danger");return}
+ for(var i=0;i<S.cart.length;i++){if(S.cart[i].m===m.code){S.cart[i].qty+=1;S.sel=i;render();say("+1 "+m.name+" · batch "+m.batch+(g?" (2D scan)":" (FEFO)"),"ok");return}}
+ S.cart.push({m:m.code,qty:1,src:g?"2D":"FEFO"});S.sel=S.cart.length-1;render();say("Added "+m.name+" · batch "+m.batch+" · exp "+m.exp+(g?" · from 2D code":" · earliest expiry picked"),"ok")}
+function say(t,k){var el=document.getElementById("scanmsg");if(el)el.innerHTML='<span class="chip '+k+'">'+(k==="ok"?"OK":"STOP")+'</span> '+esc(t)}
+
+/* ================= screens ================= */
+var NAV=[
+ ["Dashboard",[["SCR-03","Dashboard"]]],
+ ["Sales",[["SCR-04","New sale"],["SCR-08","Held sales"],["SCR-09","Returns"],["SCR-10","Invoices"]]],
+ ["Inventory",[["SCR-11","Medicines"],["SCR-14","Batches & stock"],["SCR-23","Adjust & count"],["SCR-13","Import medicines"]]],
+ ["Purchases",[["SCR-15","Goods-in"],["SCR-16","Purchase returns"],["SCR-17","Suppliers"]]],
+ ["Accounts",[["SCR-25","Cash & bank"],["SCR-22","Customer receipts"],["SCR-19","Supplier payments"],["SCR-26","Expenses"],["SCR-27","Closing"]]],
+ ["People",[["SCR-20","Customers"]]],
+ ["Reports",[["SCR-28","Reports"],["SCR-35","Controlled register"]]],
+ ["Control",[["SCR-24","Approvals"],["SCR-29","Users & roles"],["SCR-30","Audit log"],["SCR-31","Backup & restore"],["SCR-32","Settings"]]]
+];
+var A="admin",M="manager",C="cashier",K="stock",T="accountant",ALL=[A,M,C,K,T];
+var SCR={};
+function def(id,title,roles,render,o){o=o||{};SCR[id]={id:id,title:title,roles:roles,render:render,empty:o.empty,error:o.error,success:o.success,dialog:o.dialog,bg:o.bg,bare:o.bare,pos:o.pos}}
+
+/* SCR-01 Login */
+def("SCR-01","Log in",ALL,function(st){
+ var err=st==="error"?'<div class="banner danger">Cannot reach the host PHARM-HOST (192.168.1.10:8443). Check that the host PC is on, then press Retry. No data is shown until the connection works.</div>':'';
+ var ok=st==="success"?'<div class="banner ok">Password changed. Log in with your new password.</div>':'';
+ return '<section class="login" data-screen="SCR-01"><div class="art"><div class="row"><span class="cross"></span><b>MediCare Pharmacy</b></div><h1>Every tablet and every rupee, on one record.</h1><div class="stack"><span><span class="dot"></span>Host PHARM-HOST connected · 12 ms</span><span class="num">Counter COUNTER-3 · Windows 7 SP1 client 1.0.0</span></div></div>'+
+ '<div class="form"><form class="panel" id="loginForm" novalidate><h3>Log in</h3>'+err+ok+field("lu","Username","",{ph:"e.g. asad"})+
+ '<div class="field"><label for="lp">Password</label><div class="row" style="flex-wrap:nowrap"><input class="in" id="lp" type="password"><button type="button" class="btn ghost" id="lpShow" aria-pressed="false">Show</button></div></div>'+
+ '<div id="loginMsg" class="field"></div><button class="btn pri" type="submit" style="justify-content:center">Log in</button><span class="hint muted" style="font-size:var(--t-sm)">5 wrong attempts lock the account for 15 minutes. Try password "demo".</span></form></div></section>'},{bare:true});
+
+/* SCR-02 Lock */
+def("SCR-02","Session locked",ALL,function(){return '<div class="dlg" data-screen="SCR-02" role="dialog" aria-modal="true" aria-labelledby="lkT"><h2 id="lkT">Locked after 5 minutes without activity</h2><p>Counter 3 is locked. The sale in progress (5 lines, Rs '+money(totals().net)+') is kept and nothing was posted.</p>'+field("lkp","Password for "+ROLES[S.role],"",{type:"password"})+'<div class="foot"><button class="btn" type="button" data-go="SCR-01">Switch user</button><button class="btn pri" type="button" data-go="SCR-04">Unlock</button></div></div>'},{dialog:true,bg:"SCR-04"});
+
+/* SCR-03 Dashboard */
+def("SCR-03","Dashboard",ALL,function(st){
+ var fin=S.role!=="cashier"&&S.role!=="stock";
+ var k='<div class="kpis">'+(fin?kpi("Net sales today","497,325.00","742 invoices · gross 512,480")+kpi("Estimated gross profit","87,725.00",'17.6% · '+chip("ESTIMATED","warn"))+kpi("Cash received / paid","402,160 / 126,300","Purchases today 318,900.00")+kpi("Inventory at cost","18,640,200","Moving-average cost"):
+   kpi("My sales today","61,940.00","94 invoices · counter 3")+kpi("Held sales","2","Counter 3")+kpi("Returns today","1","Rs 412.00 refunded")+kpi("Shift open since","09:00","Opening float 5,000.00"))+
+  kpi("Low stock","37 medicines","Below minimum","warn")+kpi("Near expiry ≤ 90 d","64 batches","Value 186,420 at cost","warn")+kpi("Expired in quarantine","9 batches","Value 21,880 · write-off pending","danger")+
+  (fin?kpi("Customer / supplier dues","284,500 / 2,915,000","41 customers · 12 suppliers"):kpi("Approvals pending","3","Ask the manager"))+'</div>';
+ var days=[468000,512000,455000,530000,498000,541000,575000,489000,503000,522000,560000,531000,514000,497325],lab=["1","2","3","4","5","6","7","8","9","10","11","12","13","14"].map(function(d,i){return(i+1)+"-Oct"});
+ var charts='<div class="split" style="grid-template-columns:1fr 1fr 1fr"><div class="panel"><h2>Daily net sales · 1-14 Oct</h2>'+bars(days,lab)+'</div><div class="panel"><h2>By payment method · today</h2>'+donut([["Cash",71],["Card",14],["Wallet",9],["Credit",6]])+'</div><div class="panel"><h2>System health</h2>'+
+  '<div class="banner ok">Self-check passed 03:05 · stock = movements · books balanced</div><div class="banner ok">Backup 03:00 verified · 412 MB</div><div class="banner warn">Last USB copy 13-Oct 23:10 (20 h ago)</div><div class="banner warn">3 approvals pending <span class="sp"></span><button class="btn" type="button" data-go="SCR-24">Open</button></div></div></div>';
+ var top='<div class="grid2"><div class="panel"><h2>Top sellers · 7 days</h2>'+table([{l:"Medicine",k:"n"},{l:"Qty",k:"q",n:1},{l:"Revenue",k:"r",n:1}],[{n:"Panadol 500 mg",q:"1,240 strip",r:"42,160.00"},{n:"Risek 20 mg",q:"318 strip",r:"133,560.00"},{n:"Augmentin 625 mg",q:"204 strip",r:"84,048.00"},{n:"Brufen 400 mg",q:"9,870 tab",r:"73,038.00"},{n:"Calpol 120 mg/5 ml",q:"296 btl",r:"48,840.00"}])+'</div><div class="panel"><h2>Slow movers · no sale in 90 days</h2>'+table([{l:"Medicine",k:"n"},{l:"Stock",k:"s",n:1},{l:"Value at cost",k:"v",n:1}],[{n:"Mucaine suspension",s:"18 btl",v:"4,320.00"},{n:"Rigix 10 mg",s:"40 strip",v:"3,600.00"},{n:"Lipiget 10 mg",s:"26 strip",v:"7,540.00"},{n:"Surbex Z",s:"31 btl",v:"9,145.00"}])+'</div></div>';
+ return '<section class="stack" data-screen="SCR-03">'+k+charts+top+'</section>'},
+ {empty:["No transactions yet today","Figures appear after the first posted sale or purchase. The opening stock value shows once goods-in is posted."],error:"Dashboard figures could not be loaded: the host took more than 10 s to answer. Figures are not shown rather than shown stale. Retry, or check the host monitor.",success:"Self-check passed 03:05 and backup verified."});
+
+/* SCR-04 POS */
+def("SCR-04","New sale",[A,M,C],function(st){
+ var L=st==="empty"?[]:lines(),t=st==="empty"?{gross:0,units:0,lines:0,disc:0,net:0}:totals(),sl=L[S.sel];
+ var empty=st==="empty"||!L.length;
+ var rows=empty?'<div class="empty"><h3>Ready for the first item</h3><p>Scan a barcode or a 2D pack code, or press F2 to search by name.</p></div>':table([
+  {l:"Medicine",f:function(l){return'<div class="mn">'+esc(l.m.name)+(l.m.sched?' '+chip("SCH "+l.m.sched,"danger"):'')+'</div><div class="ms">'+esc(l.m.form+" · "+l.m.pack+" · "+l.m.mfr)+'</div>'}},
+  {l:"Batch · Expiry",f:function(l){return'<span class="num">'+l.m.batch+'</span> · '+l.m.exp+' '+(l.m.days<=90?chip(l.m.days+" DAYS","warn"):l.src==="2D"?chip("2D SCAN","info"):chip("FEFO"))}},
+  {l:"Qty",n:1,f:function(l){return l.qty+" "+l.m.unit}},{l:"Rate",n:1,f:function(l){return money(l.m.rate)}},{l:"Amount",n:1,f:function(l){return money(l.amt)}}],L,{sel:S.sel,click:"selLine"});
+ var insp=sl?'<div class="panel insp"><h2>Selected line · '+esc(sl.m.name)+'</h2><div class="rw"><span>Batch ('+(sl.src==="2D"?"from 2D code":"FEFO")+')</span><b>'+sl.m.batch+'</b></div><div class="rw"><span>Expires</span><b>'+sl.m.exp+' · '+sl.m.days+' d</b></div><div class="bar" aria-hidden="true"><i style="width:'+Math.min(100,Math.round(sl.m.days/365*100))+'%"></i></div><div class="rw"><span>Rack</span><b>'+sl.m.rack+'</b></div><div class="rw"><span>Available</span><b>'+sl.m.avail+'</b></div><button class="btn" type="button" data-act="batch">Change batch <kbd>F7</kbd></button></div>':'<div class="panel"><h2>Selected line</h2><p class="muted">Nothing selected.</p></div>';
+ var err=st==="error"?'<div class="banner danger">Stock changed: Augmentin 625 mg has 0 strips left in batch AG2391 (sold at counter 5). Press F7 to use AG2512, or remove the line.</div>':'';
+ var ok=st==="success"?'<div class="banner ok">Sale SI-C3-261014-0481 posted · Rs 640.00 · receipt printed</div>':'';
+ return '<div class="posbody" data-screen="SCR-04"><div class="posleft">'+
+  '<div class="scan"><span aria-hidden="true">▦</span><label for="scanIn" class="sr">Scan barcode or type medicine name</label><input id="scanIn" autocomplete="off" placeholder="Scan barcode or type medicine name"><kbd>F2 search</kbd></div>'+
+  '<div class="scanmsg" id="scanmsg" aria-live="polite">'+err+ok+'</div>'+rows+'</div>'+
+  '<div class="posside">'+insp+'<div class="panel sums"><div class="rw"><span>Items</span><span>'+t.lines+' lines · '+t.units+' units</span></div><div class="rw"><span>Gross</span><span>'+money(t.gross)+'</span></div><div class="rw"><span>Discount (invoice)</span><span>'+money(-t.disc)+'</span></div><div class="rw"><span>Tax</span><span>0.00</span></div></div>'+
+  '<div class="stack" style="gap:var(--s-2)"><div class="total"><small>Net payable</small><span class="amt">Rs '+money(t.net)+'</span></div><div class="acts"><button class="btn" type="button" data-go="SCR-20">Customer <kbd>F3</kbd></button><button class="btn" type="button" data-act="hold">Hold <kbd>F5</kbd></button><button class="btn" type="button" data-act="disc">Discount <kbd>F6</kbd></button><button class="btn pri" type="button" data-act="pay">Take payment <kbd>F4</kbd></button></div></div></div></div>'+
+  '<div class="keys" role="toolbar" aria-label="Function keys">'+[["F2","Find","find"],["F3","Customer","cust"],["F4","Payment","pay"],["F5","Hold/Recall","hold"],["F6","Discount","disc"],["F7","Batch","batch"],["F8","Reprint","reprint"],["F9","Return","ret"],["Del","Remove","del"],["Esc","Cancel","cancel"]].map(function(k){return'<button type="button" class="key'+(k[0]==="F4"?" go":"")+'" data-act="'+k[2]+'"><b>'+k[0]+'</b><span>'+k[1]+'</span></button>'}).join("")+'</div>'},{pos:true});
+
+/* SCR-05 Payment */
+def("SCR-05","Payment",[A,M,C],function(st){
+ var t=totals(),tn=parseFloat(S.tendered)||0,body="",can=false;
+ if(S.pay==="cash"){var ch=tn-t.net;can=tn>=t.net;body=field("tend","Cash tendered",S.tendered,{n:1,err:tn<t.net?"Tendered is Rs "+money(t.net-tn)+" short of the amount due.":null})+'<div class="bigline"><span>Change due</span><b>'+(can?money(ch):"—")+'</b></div>'}
+ else if(S.pay==="split"){body='<div class="grid2">'+field("spCash","Cash","800.00",{n:1})+field("spCard","Card (Bank Alfalah POS)","300.00",{n:1})+'</div><div class="bigline"><span>Remaining</span><b>0.00</b></div><span class="hint">Split payments must add up exactly to the net payable.</span>';can=true}
+ else if(S.pay==="credit"){body='<div class="banner warn">Credit needs a named customer. Press F3 to pick one. Walk-in sales cannot go on credit.</div>'}
+ else{body=field("ref","Reference / slip no.","",{hint:S.pay==="card"?"Last 4 digits or slip number":"Transaction ID from the wallet"})+'<div class="bigline"><span>Amount</span><b>'+money(t.net)+'</b></div>';can=true}
+ var err=st==="error"?'<div class="banner danger">Receipt printer EPSON TM-T82 is offline. Sale SI-C3-261014-0482 is saved. Fix the printer and press F8 to reprint.</div>':'';
+ var ok=st==="success"?'<div class="banner ok">Posted SI-C3-261014-0482 · Rs '+money(t.net)+' · change '+money((parseFloat(S.tendered)||0)-t.net)+'</div>':'';
+ return '<div class="dlg" data-screen="SCR-05" role="dialog" aria-modal="true" aria-labelledby="payT"><h2 id="payT">Take payment · Rs '+money(t.net)+'</h2>'+err+ok+
+  '<div class="tender" role="radiogroup" aria-label="Payment method">'+[["cash","Cash","1"],["card","Card","2"],["wallet","Wallet","3"],["split","Split","4"],["credit","Credit","5"]].map(function(p){return'<button type="button" role="radio" aria-checked="'+(S.pay===p[0])+'" class="'+(S.pay===p[0]?"on":"")+'" data-pay="'+p[0]+'">'+p[1]+'<small>'+p[2]+'</small></button>'}).join("")+'</div>'+body+
+  '<div class="foot"><button class="btn" type="button" data-act="closeDlg">Back <kbd>Esc</kbd></button><button class="btn pri" type="button" data-act="complete" '+(can?"":"disabled")+'>Complete sale <kbd>Enter</kbd></button></div></div>'},{dialog:true,bg:"SCR-04"});
+
+/* SCR-06 Batch picker */
+def("SCR-06","Choose batch",[A,M,C],function(){
+ return '<div class="dlg wide" data-screen="SCR-06" role="dialog" aria-modal="true" aria-labelledby="bpT"><h2 id="bpT">Batches · Augmentin 625 mg</h2><p class="muted">FEFO picked the earliest expiry. Choose another batch only when the customer has a reason (e.g. longer course). The choice is logged.</p>'+
+ table([{l:"Batch",k:"b"},{l:"Expiry",k:"e"},{l:"State",k:"s"},{l:"Rack",k:"r"},{l:"Available",k:"a",n:1},{l:"Sale price",k:"p",n:1}],[
+  {b:'<span class="num">AG2391</span>',e:"30-Nov-2026 "+chip("47 DAYS","warn"),s:chip("SALEABLE","ok"),r:"B-3",a:"34 strip",p:"412.00"},
+  {b:'<span class="num">AG2512</span>',e:"31-May-2027",s:chip("SALEABLE","ok"),r:"B-3",a:"62 strip",p:"412.00"},
+  {b:'<span class="num">AG2208</span>',e:"31-Aug-2026",s:chip("EXPIRED","danger"),r:"Quarantine Q-1",a:"0 saleable",p:"—"}],{sel:0,click:"pickBatch"})+
+ '<div class="foot"><button class="btn" type="button" data-act="closeDlg">Keep FEFO <kbd>Esc</kbd></button><button class="btn pri" type="button" data-act="closeDlg">Use AG2512 <kbd>Enter</kbd></button></div></div>'},{dialog:true,bg:"SCR-04"});
+
+/* SCR-07 Approval */
+def("SCR-07","Manager approval",[A,M,C],function(st){
+ var bad=st==="error";
+ return '<div class="dlg" data-screen="SCR-07" role="dialog" aria-modal="true" aria-labelledby="apT"><h2 id="apT">Approval needed · discount 12%</h2><p>Asad\'s discount limit is 5%. A manager can approve this discount here, on counter 3.</p>'+
+ '<div class="panel" style="padding:var(--s-3)"><div class="row" style="justify-content:space-between"><span>Invoice discount</span><b class="num">Rs 136.68 (12%)</b></div><div class="row" style="justify-content:space-between"><span>Net payable after discount</span><b class="num">Rs 1,002.32</b></div></div>'+
+ '<div class="grid2">'+field("apU","Approver","Sana (Pharmacist)",{sel:["Sana (Pharmacist)","Rehan (Administrator)"]})+field("apP","Approval PIN","",{type:"password",err:bad?"Wrong PIN. 2 tries left before Sana's PIN is locked for 15 minutes.":null})+'</div>'+field("apR","Reason (required)","Regular customer, senior citizen",{})+
+ '<div class="foot"><button class="btn" type="button" data-act="closeDlg">Cancel discount</button><button class="btn pri" type="button" data-act="approve">Approve <kbd>Enter</kbd></button></div><span class="hint muted">Recorded in the audit log with both names, this PC and the cart total.</span></div>'},{dialog:true,bg:"SCR-04"});
+
+/* SCR-08 Held */
+def("SCR-08","Held sales",[A,M,C],function(){return '<section class="stack" data-screen="SCR-08">'+table([{l:"Held at",k:"t"},{l:"Counter",k:"c"},{l:"Customer",k:"u"},{l:"Lines",k:"l",n:1},{l:"Amount",k:"a",n:1},{l:"Note",k:"n"},{l:"",f:function(){return'<button class="btn" type="button" data-go="SCR-04">Recall</button>'}}],[{t:"19:31",c:"3 · Asad",u:"Walk-in",l:4,a:"860.00",n:"Customer went to ATM"},{t:"19:18",c:"3 · Asad",u:"Nadia Pervaiz",l:2,a:"1,240.00",n:"Waiting for prescription"}])+'<p class="muted">Held sales stay on the host for 24 hours, then they are cancelled and logged. Stock is not reserved while a sale is held.</p></section>'},
+ {empty:["No held sales","Press F5 on the sale screen to park a sale and serve the next customer."],error:"Held sales could not be loaded. The host is reachable but returned an error (HOLD_LIST_FAILED). Retry; if it repeats, tell the administrator.",success:"Sale recalled to counter 3."});
+
+/* SCR-09 Returns */
+def("SCR-09","Sales return",[A,M,C],function(st){
+ return '<section class="stack" data-screen="SCR-09"><div class="row">'+field("rInv","Original invoice","SI-C2-261012-0217",{hint:"Scan the receipt barcode or type the number"})+'<div class="kv"><small>Sold</small><span>12-Oct-2026 18:05 · Walk-in · cash</span></div></div>'+
+ table([{l:"Medicine",k:"m"},{l:"Batch",k:"b"},{l:"Sold",k:"s",n:1},{l:"Returned before",k:"p",n:1},{l:"Return now",f:function(r){return'<input class="in n" style="width:70px" id="rq'+r.i+'" value="'+r.q+'" aria-label="Return quantity">'}},{l:"Reason",f:function(r){return r.why}},{l:"Inspection",f:function(r){return r.ins}},{l:"Refund",k:"a",n:1}],
+ [{i:0,m:"Augmentin 625 mg",b:'<span class="num">AG2391</span>',s:"2 strip",p:"0",q:"1",why:"Doctor changed medicine",ins:chip("RESTOCK","ok"),a:"412.00"},{i:1,m:"Calpol 120 mg/5 ml",b:'<span class="num">CP3302</span>',s:"1 btl",p:"0",q:"1",why:"Seal broken",ins:chip("QUARANTINE","warn"),a:"165.00"}],{foot:["","","","","","","Total",'577.00']})+
+ '<div class="grid3">'+field("rM","Refund method","Cash",{sel:["Cash","Bank / card reversal","Customer credit note"]})+field("rA","Approval","",{ro:1,hint:"Refunds above Rs 500 need a manager PIN"})+'<div class="stack" style="align-content:end"><button class="btn pri" type="button" data-act="approveRefund">Post return (cannot be edited later)</button></div></div>'+
+ (st==="error"?'<div class="banner danger">Return quantity 3 is more than the 2 strips still returnable on this invoice. Enter 2 or less.</div>':'')+(st==="success"?'<div class="banner ok">Return SR-C3-261014-0009 posted. Rs 577.00 refunded in cash. 1 strip restocked to AG2391; 1 bottle moved to quarantine.</div>':'')+'</section>'},
+ {empty:["Find the original sale","Scan the barcode on the customer's receipt or type the invoice number. Returns always reference the original invoice."]});
+
+/* SCR-10 Invoices */
+def("SCR-10","Invoices",[A,M,C,T],function(){return '<section class="stack" data-screen="SCR-10"><div class="row">'+field("iq","Search","",{ph:"Invoice no., customer, mobile"})+field("id1","From","14-Oct-2026")+field("id2","To","14-Oct-2026")+field("ic","Counter","All",{sel:["All","1","2","3","4","5","6","7","8"]})+'</div>'+
+ table([{l:"Invoice",k:"n"},{l:"Time",k:"t"},{l:"Counter / cashier",k:"c"},{l:"Customer",k:"u"},{l:"Payment",k:"p"},{l:"Amount",k:"a",n:1},{l:"Status",k:"s"},{l:"",f:function(r){return'<button class="btn" type="button" data-act="reprint">Reprint</button>'}}],[
+ {n:'<span class="num">SI-C3-261014-0481</span>',t:"19:38",c:"3 · Asad",u:"Walk-in",p:"Cash",a:"640.00",s:chip("POSTED","ok")},{n:'<span class="num">SI-C5-261014-0477</span>',t:"19:36",c:"5 · Hina",u:"Hafiz Clinic",p:"Credit",a:"8,420.00",s:chip("POSTED","ok")},{n:'<span class="num">SI-C1-261014-0470</span>',t:"19:30",c:"1 · Usman",u:"Walk-in",p:"Split",a:"2,310.00",s:chip("POSTED","ok")},{n:'<span class="num">SI-C3-261014-0455</span>',t:"19:02",c:"3 · Asad",u:"Walk-in",p:"Cash",a:"120.00",s:chip("REVERSED","danger")},{n:'<span class="num">SI-C2-261014-0451</span>',t:"18:58",c:"2 · Bilal",u:"Nadia Pervaiz",p:"Card",a:"1,240.00",s:chip("PART RETURNED","warn")}])+
+ '<p class="muted">Reprints say DUPLICATE and are logged. Reversal needs a manager approval and a reason, and creates a reversing document. The original is never edited or deleted.</p></section>'},
+ {empty:["No invoices in this period","Change the dates or counter filter."],error:"Search failed: the date range is more than 92 days. Narrow it, or use the Daily sales report.",success:"Duplicate receipt for SI-C3-261014-0481 sent to EPSON TM-T82."});
+
+/* SCR-11 Medicines */
+def("SCR-11","Medicines",ALL,function(){var q=(S.medq||"").toLowerCase();var rows=MEDS.filter(function(m){return!q||(m.name+m.generic+m.code+m.mfr).toLowerCase().indexOf(q)>=0});
+ return '<section class="stack" data-screen="SCR-11"><div class="row"><div class="field" style="flex:1"><label for="mq">Search name, generic, brand or barcode</label><input class="in" id="mq" value="'+esc(S.medq||"")+'" placeholder="e.g. paracetamol"></div>'+field("mf","Status","Active",{sel:["Active","Inactive","All"]})+'<div class="stack" style="align-content:end"><button class="btn acc" type="button" data-go="SCR-12">New medicine</button></div></div>'+
+ (rows.length?table([{l:"ID",f:function(m){return'<span class="num">'+m.id+'</span>'}},{l:"Medicine",f:function(m){return'<b>'+esc(m.name)+'</b> '+(m.sched?chip("SCH "+m.sched,"danger"):"")}},{l:"Generic",k:"generic"},{l:"Form / pack",f:function(m){return m.form+" · "+m.pack}},{l:"Manufacturer",k:"mfr"},{l:"Stock",n:1,f:function(m){return m.avail}},{l:"Sale price",n:1,f:function(m){return money(m.rate)}},{l:"Status",f:function(m){return m.status==="Active"?(m.stock<m.min?chip("LOW STOCK","warn"):chip("ACTIVE","ok")):chip("INACTIVE")}}],rows,{click:"openMed"}):'<div class="empty"><h3>No medicine matches "'+esc(q)+'"</h3><p>Check the spelling, search by generic name, or add it as a new medicine.</p></div>')+'</section>'},
+ {empty:["No medicines yet","Import your medicine list from Excel or CSV, or add medicines one by one."],error:"The medicine list could not be loaded (timeout after 10 s). Retry.",success:"Medicine Augmentin 625 mg saved. Price change from 398.00 to 412.00 recorded in the audit log."});
+
+/* SCR-12 Medicine editor */
+def("SCR-12","Medicine · Augmentin 625 mg",[A,M],function(st){
+ return '<section class="stack" data-screen="SCR-12">'+(st==="error"?'<div class="banner danger">Barcode 8964000404042 is already assigned to Augmentin 1 g (M-00088). Each barcode can belong to one medicine only.</div>':'')+
+ '<div class="grid2"><div class="panel"><h2>Identity</h2><div class="grid2">'+field("e1","Medicine ID","M-00087",{ro:1})+field("e2","Medicine name","Augmentin 625 mg")+field("e3","Generic","Co-amoxiclav")+field("e4","Brand","Augmentin")+field("e5","Manufacturer","GSK",{sel:["GSK","Getz Pharma","Abbott","Pfizer","Sanofi"]})+field("e6","Category","Antibiotics",{sel:["Antibiotics","Analgesics","Gastro","Vitamins"]})+field("e7","Dosage form","Tablet",{sel:["Tablet","Capsule","Syrup","Injection","Cream","Drops"]})+field("e8","Strength","500 mg + 125 mg")+field("e9","Urdu name (receipt)","آگمینٹن ۶۲۵")+field("e10","Status","Active",{sel:["Active","Inactive"]})+'</div></div>'+
+ '<div class="stack"><div class="panel"><h2>Packs and units</h2>'+table([{l:"Level",k:"l"},{l:"Contains",k:"c"},{l:"Base units",k:"b",n:1},{l:"Sell?",k:"s"},{l:"Price",k:"p",n:1}],[{l:"Box",c:"2 strip",b:"12",s:"Yes",p:"824.00"},{l:"Strip",c:"6 tablet",b:"6",s:"Yes (default)",p:"412.00"},{l:"Tablet",c:"base unit",b:"1",s:"No",p:"—"}])+'<span class="hint muted">Stock is kept in tablets (base unit). Purchase unit: Box.</span></div>'+
+ '<div class="panel"><h2>Prices, tax and flags</h2><div class="grid3">'+field("p1","Default purchase price / box","702.20",{n:1})+field("p2","Default sale price / strip","412.00",{n:1})+field("p3","Tax rate %","0",{n:1})+field("p4","Minimum stock (strip)","120",{n:1})+field("p5","Prescription required","Yes",{sel:["Yes","No"]})+field("p6","Drug schedule","None",{sel:["None","Schedule B","Schedule D","Schedule G"]})+'</div></div></div></div>'+
+ '<div class="grid2"><div class="panel"><h2>Barcodes</h2>'+table([{l:"Barcode",k:"b"},{l:"Type",k:"t"},{l:"Pack level",k:"p"}],[{b:'<span class="num">8964000404042</span>',t:"EAN-13",p:"Strip"},{b:'<span class="num">08964000404059</span>',t:"GTIN-14 (GS1 2D)",p:"Box"}])+'<button class="btn" type="button">Add barcode</button></div><div class="panel"><h2>Stock now</h2>'+table([{l:"Batch",k:"b"},{l:"Expiry",k:"e"},{l:"Saleable",k:"s",n:1},{l:"Quarantine",k:"q",n:1}],[{b:"AG2391",e:"Nov-26",s:"34 strip",q:"0"},{b:"AG2512",e:"May-27",s:"62 strip",q:"0"},{b:"AG2208",e:"Aug-26",s:"0",q:"4 strip"}])+'</div></div>'+
+ '<div class="row" style="justify-content:flex-end"><button class="btn" type="button" data-go="SCR-11">Cancel</button><button class="btn pri" type="button" data-act="saveMed">Save medicine</button></div>'+(st==="success"?'<div class="banner ok">Saved. Price change 398.00 → 412.00 recorded. Posted invoices keep their original prices.</div>':'')+'</section>'},{});
+
+/* SCR-13 Import */
+def("SCR-13","Import medicines",[A,M],function(st){var step=S.importStep;var stp=["Upload file","Map columns","Validate","Import"];
+ var head='<div class="steps">'+stp.map(function(s,i){return'<span class="'+(i<step?"done":i===step?"on":"")+'">'+(i+1)+". "+s+'</span>'}).join("")+'</div>';
+ var body;
+ if(step===0)body='<div class="panel"><h2>Choose file</h2><p>Excel (.xlsx) or CSV (UTF-8). First row must be column headings. Up to 50,000 rows.</p><div class="row"><button class="btn acc" type="button" data-act="impNext">Choose medicines_list.xlsx</button><span class="muted">medicines_list.xlsx · 4,812 rows · 612 KB</span></div></div>';
+ else if(step===1)body='<div class="panel"><h2>Match your columns</h2>'+table([{l:"Your column",k:"a"},{l:"MediCare field",f:function(r){return'<select class="in" aria-label="Field for '+r.a+'"><option>'+r.b+'</option></select>'}},{l:"Sample",k:"s"}],[{a:"Item Name",b:"Medicine name",s:"AUGMENTIN 625MG TAB"},{a:"Barcode",b:"Barcode",s:"8964000404042"},{a:"Generic",b:"Generic name",s:"Co-amoxiclav"},{a:"Company",b:"Manufacturer",s:"GSK"},{a:"Pack",b:"Pack size (base units)",s:"6"},{a:"TP",b:"Default purchase price",s:"351.10"},{a:"MRP",b:"Default sale price",s:"412.00"}])+'<div class="row" style="justify-content:flex-end"><button class="btn pri" type="button" data-act="impNext">Validate 4,812 rows</button></div></div>';
+ else if(step===2)body='<div class="kpis">'+kpi("Rows read","4,812","medicines_list.xlsx")+kpi("Ready","4,760","Will be created","")+kpi("Warnings","38","Imported, please review","warn")+kpi("Errors","14","Skipped until fixed","danger")+'</div>'+
+  table([{l:"Row",k:"r",n:1},{l:"Medicine",k:"m"},{l:"Problem",k:"p"},{l:"Severity",k:"s"}],[{r:"118",m:"PANADOL 500MG TAB",p:"Barcode 8964000101011 also on row 2,240 (Panadol Extra)",s:chip("ERROR","danger")},{r:"406",m:"SURBEX Z",p:"Pack size missing",s:chip("ERROR","danger")},{r:"1,022",m:"RISEK 20MG",p:"Sale price 0.00",s:chip("WARNING","warn")},{r:"2,903",m:"Ponstan 500",p:"Looks like a duplicate of PONSTAN 500MG TAB (same strength and company)",s:chip("WARNING","warn")}],{h:220})+
+  '<div class="row" style="justify-content:flex-end"><button class="btn" type="button">Download error rows (CSV)</button><button class="btn" type="button" data-act="impDry">Dry run</button><button class="btn pri" type="button" data-act="impNext">Import 4,798 medicines</button></div>';
+ else body='<div class="banner ok">Imported 4,798 medicines in one transaction (IMP-0003). 14 rows skipped. You can undo this import until the first stock is received.</div>';
+ return '<section class="stack" data-screen="SCR-13">'+head+(st==="error"?'<div class="banner danger">The file could not be read: sheet "Sheet1" has no heading row. Put column names in row 1 and choose the file again.</div>':body)+'</section>'},{empty:["No import yet","Import is for the first load of your medicine list. Stock and balances are entered through goods-in and opening entries."],success:"Imported 4,798 medicines. 14 rows skipped (see error file)."});
+
+/* SCR-14 Batches */
+def("SCR-14","Batches & stock",[A,M,C,K,T],function(){var t=cur("bt","Near expiry");
+ var data={"All saleable":[["PN4417","Panadol 500 mg","Jan-28","473",chip("SALEABLE","ok"),"212 strip","A-1"],["RK0925","Risek 20 mg","Aug-27","321",chip("SALEABLE","ok"),"48 strip","C-5"]],
+ "Near expiry":[["AG2391","Augmentin 625 mg","Nov-26","47",chip("47 DAYS","warn"),"34 strip","B-3"],["AR5521","Arinac Forte","Feb-27","139",chip("139 DAYS","warn"),"9 strip","A-6"]],
+ "Expired":[["FL1180","Flagyl 400 mg","Aug-26","−44",chip("EXPIRED","danger"),"18 strip","Q-1"],["AG2208","Augmentin 625 mg","Aug-26","−44",chip("EXPIRED","danger"),"4 strip","Q-1"]],
+ "Quarantine":[["CP3299","Calpol 120 mg/5 ml","Jun-27","259",chip("DAMAGED","warn"),"3 btl","Q-2"]],
+ "Low stock":[["AR5521","Arinac Forte","Feb-27","139",chip("LOW","warn"),"9 strip (min 20)","A-6"]]};
+ return '<section class="stack" data-screen="SCR-14">'+tabs("bt",["All saleable","Near expiry","Expired","Quarantine","Low stock"])+'<div class="row">'+field("bw","Near-expiry window (days)","90",{n:1,hint:"Set in Settings → Thresholds"})+'</div>'+
+ table([{l:"Batch",f:function(r){return'<span class="num">'+r[0]+'</span>'}},{l:"Medicine",f:function(r){return r[1]}},{l:"Expiry",f:function(r){return r[2]}},{l:"Days left",n:1,f:function(r){return r[3]}},{l:"State",f:function(r){return r[4]}},{l:"Available",n:1,f:function(r){return r[5]}},{l:"Rack",f:function(r){return r[6]}}],data[t])+
+ '<p class="muted">Every quantity here is the sum of its stock movements. Open a batch to see each purchase, sale, return and adjustment that changed it.</p></section>'},
+ {empty:["No batches yet","Batches are created when you post a goods-in (purchase) invoice."],error:"Stock list failed to load because the host is busy with a backup. Try again in a minute.",success:"Nightly self-check: all 3,912 batch balances match their movements."});
+
+/* SCR-15 Goods-in */
+def("SCR-15","Goods-in · PI-261014-0031",[A,M,K],function(st){
+ var L=S.gin||[{m:"Risek 20 mg",b:"RK0925",e:"08/2027",q:"20",f:"2",u:"Box (5 strip)",r:"1,754.00",d:"2",t:"0",n:"34,378.40",mrp:"420.00",cap:"2D"},{m:"Panadol 500 mg",b:"PN4502",e:"03/2028",q:"30",f:"0",u:"Box (20 strip)",r:"578.00",d:"0",t:"0",n:"17,340.00",mrp:"34.00",cap:"1D"}];
+ return '<section class="stack" data-screen="SCR-15"><div class="grid3">'+field("g1","Supplier","Muller & Phipps Pakistan",{sel:["Muller & Phipps Pakistan","IBL Healthcare","Premier Agencies","Mehran Distributors"]})+field("g2","Supplier invoice no.","MP/LHR/88213")+field("g3","Invoice date","14-Oct-2026")+field("g4","Due date","13-Nov-2026",{hint:"Terms: 30 days"})+field("g5","Status","Draft",{ro:1})+field("g6","Notes","Evening delivery, 2 cartons")+'</div>'+
+ '<div class="scan"><span aria-hidden="true">▦</span><label for="ginScan" class="sr">Scan pack code</label><input id="ginScan" placeholder="Scan the 2D code on each box, or a barcode, or type a name"><kbd>Ctrl+Enter post</kbd></div><div class="scanmsg" id="ginmsg" aria-live="polite"></div>'+
+ table([{l:"Medicine",k:"m"},{l:"Batch",f:function(r){return'<span class="num">'+r.b+'</span> '+(r.cap==="2D"?chip("2D","info"):"")}},{l:"Expiry",k:"e"},{l:"Qty",k:"q",n:1},{l:"Free",k:"f",n:1},{l:"Unit",k:"u"},{l:"Rate",k:"r",n:1},{l:"Disc %",k:"d",n:1},{l:"Tax %",k:"t",n:1},{l:"Net",k:"n",n:1},{l:"MRP",k:"mrp",n:1}],L)+
+ '<div class="grid2"><div class="panel"><h2>Payment now</h2><div class="grid2">'+field("g7","Amount paid","20,000.00",{n:1})+field("g8","From account","Cash in hand",{sel:["Cash in hand","Meezan Bank current"]})+'</div></div><div class="panel sums"><div class="rw"><span>Gross</span><span>52,420.00</span></div><div class="rw"><span>Discount</span><span>− 701.60</span></div><div class="rw"><span>Tax</span><span>0.00</span></div><div class="rw"><span>Additional charges (freight)</span><span>350.00</span></div><div class="rw"><b>Net invoice</b><b class="num">52,068.40</b></div><div class="rw"><span>Outstanding payable</span><span>32,068.40</span></div></div></div>'+
+ '<div class="row" style="justify-content:flex-end"><button class="btn" type="button">Save draft</button><button class="btn pri" type="button" data-act="postPI">Post invoice <kbd>Ctrl+Enter</kbd></button></div>'+
+ (st==="error"?'<div class="banner danger">Line 2: expiry 03/2028 is before the manufacturing date 06/2028. Check the date printed on the box.</div>':'')+(st==="success"?'<div class="banner ok">Posted PI-261014-0031. 2 batches updated, average cost recalculated, payable Rs 32,068.40 to Muller & Phipps. Voucher sent to the A4 printer.</div>':'')+'</section>'},
+ {empty:["Start a goods-in","Pick the supplier and enter their bill number, then scan each box. 2D codes fill in batch and expiry for you."]});
+
+/* SCR-16 Purchase return */
+def("SCR-16","Purchase return",[A,M,K],function(){return '<section class="stack" data-screen="SCR-16"><div class="grid3">'+field("pr1","Original purchase","PI-261002-0018 · IBL Healthcare")+field("pr2","Supplier credit note ref.","IBL-CN-4471")+field("pr3","Status","Draft",{ro:1})+'</div>'+
+ table([{l:"Medicine",k:"m"},{l:"Batch",k:"b"},{l:"Purchased",k:"p",n:1},{l:"Returned before",k:"rb",n:1},{l:"Available",k:"a",n:1},{l:"Return qty",k:"q",n:1},{l:"Reason",k:"w"},{l:"Amount",k:"t",n:1}],[{m:"Flagyl 400 mg",b:"FL1180",p:"40 strip",rb:"0",a:"18 strip (quarantine)",q:"18 strip",w:"Expired, supplier takes back",t:"756.00"}])+
+ '<div class="row" style="justify-content:space-between"><span class="muted">Posting reduces stock and IBL\'s payable by Rs 756.00. A cash refund from the supplier, if any, is recorded separately in Cash & bank.</span><button class="btn pri" type="button">Post return</button></div></section>'},{empty:["No purchase selected","Choose the original purchase invoice. Returns must reference the batch they came in on."],error:"Return qty 20 is more than the 18 strips of FL1180 still in stock.",success:"Purchase return PR-261014-0004 posted. Supplier credit Rs 756.00."});
+
+/* SCR-17 Suppliers */
+def("SCR-17","Suppliers",[A,M,K,T],function(){return '<section class="split" data-screen="SCR-17">'+table([{l:"Code",k:"c"},{l:"Supplier",k:"n"},{l:"Contact",k:"p"},{l:"Terms",k:"t"},{l:"Payable",k:"b",n:1},{l:"Status",k:"s"}],[{c:"SUP-001",n:"Muller & Phipps Pakistan",p:"0300-1234567",t:"30 days",b:"922,288.40",s:chip("ACTIVE","ok")},{c:"SUP-002",n:"IBL Healthcare",p:"0321-7654321",t:"21 days",b:"642,900.00",s:chip("ACTIVE","ok")},{c:"SUP-003",n:"Premier Agencies",p:"0333-1112223",t:"15 days",b:"512,040.00",s:chip("ACTIVE","ok")},{c:"SUP-004",n:"Mehran Distributors",p:"0345-9988776",t:"Cash",b:"0.00",s:chip("INACTIVE")}],{sel:0,click:"openSup"})+
+ '<div class="panel"><h2>Supplier · SUP-001</h2>'+field("s1","Name","Muller & Phipps Pakistan")+field("s2","Contact person","Kamran Aslam")+field("s3","Mobile","0300-1234567")+field("s4","NTN / registration","1234567-8")+field("s5","Opening balance","950,000.00",{n:1,ro:1,hint:"Posted as opening entry OB-0002 on 01-Jul-2026"})+'<div class="row"><button class="btn" type="button" data-go="SCR-18">Ledger</button><button class="btn" type="button" data-go="SCR-19">Pay</button><button class="btn pri" type="button">Save</button></div></div></section>'},
+ {empty:["No suppliers yet","Add your distributors before the first goods-in."],error:"Supplier name and mobile number are required.",success:"Supplier saved."});
+
+/* SCR-18 Supplier ledger */
+def("SCR-18","Supplier ledger · Muller & Phipps",[A,M,T],function(){return '<section class="stack" data-screen="SCR-18"><div class="row">'+field("sl1","From","01-Oct-2026")+field("sl2","To","14-Oct-2026")+'<div class="stack" style="align-content:end"><button class="btn" type="button">Print statement</button></div><div class="stack" style="align-content:end"><button class="btn" type="button">Balance confirmation (A4)</button></div></div>'+
+ table([{l:"Date",k:"d"},{l:"Document",k:"n"},{l:"Details",k:"x"},{l:"Debit",k:"dr",n:1},{l:"Credit",k:"cr",n:1},{l:"Balance",k:"b",n:1}],[{d:"01-Oct-2026",n:"—",x:"Opening balance",dr:"",cr:"",b:"1,032,000.00 Cr"},{d:"03-Oct-2026",n:'<span class="num">PI-261003-0021</span>',x:"Purchase",dr:"",cr:"142,600.00",b:"1,174,600.00 Cr"},{d:"07-Oct-2026",n:'<span class="num">SP-261007-0006</span>',x:"Payment, Meezan chq 004512",dr:"300,000.00",cr:"",b:"874,600.00 Cr"},{d:"10-Oct-2026",n:'<span class="num">PR-261010-0002</span>',x:"Purchase return, expired",dr:"4,380.00",cr:"",b:"870,220.00 Cr"},{d:"14-Oct-2026",n:'<span class="num">PI-261014-0031</span>',x:"Purchase",dr:"",cr:"52,068.40",b:"922,288.40 Cr"}],{cls:"ledger"})+'</section>'},{empty:["No entries in this period","Widen the dates."],error:"Statement could not be generated. Retry.",success:"Statement sent to A4 printer."});
+
+/* SCR-19 Supplier payment */
+def("SCR-19","Supplier payment",[A,M,T],function(st){return '<section class="stack" data-screen="SCR-19"><div class="grid3">'+field("sp1","Supplier","Muller & Phipps Pakistan",{sel:["Muller & Phipps Pakistan","IBL Healthcare"]})+field("sp2","Amount","200,000.00",{n:1})+field("sp3","Pay from","Meezan Bank current",{sel:["Cash in hand","Meezan Bank current"]})+field("sp4","Cheque / reference","004519")+field("sp5","Date","14-Oct-2026")+field("sp6","Voucher no.","assigned on posting",{ro:1})+'</div>'+
+ table([{l:"Invoice",k:"n"},{l:"Date",k:"d"},{l:"Due",k:"u"},{l:"Outstanding",k:"o",n:1},{l:"Allocate",f:function(r){return'<input class="in n" style="width:120px" value="'+r.a+'" aria-label="Allocate to '+r.n+'">'}}],[{n:"PI-260921-0012",d:"21-Sep",u:"21-Oct",o:"120,400.00",a:"120,400.00"},{n:"PI-261003-0021",d:"03-Oct",u:"02-Nov",o:"142,600.00",a:"79,600.00"},{n:"PI-261014-0031",d:"14-Oct",u:"13-Nov",o:"32,068.40",a:"0.00"}],{foot:["","","Allocated","200,000.00","Advance 0.00"]})+
+ (st==="error"?'<div class="banner danger">Meezan Bank current has Rs 164,300.00. Balance enforcement is on, so this payment cannot exceed the available balance.</div>':'<div class="row" style="justify-content:flex-end"><button class="btn pri" type="button">Post payment and print voucher</button></div>')+(st==="success"?'<div class="banner ok">SP-261014-0009 posted. Ledger and bankbook updated.</div>':'')+'</section>'},{empty:["Choose a supplier","Outstanding bills appear here to allocate the payment."]});
+
+/* SCR-20 Customers */
+def("SCR-20","Customers",[A,M,C,T],function(){return '<section class="split" data-screen="SCR-20"><div class="stack">'+field("cq","Search name, ID or mobile","",{ph:"0300…"})+table([{l:"ID",k:"i"},{l:"Name",k:"n"},{l:"Mobile",k:"m"},{l:"Type",k:"t"},{l:"Limit",k:"l",n:1},{l:"Balance",k:"b",n:1}],[{i:"C-0001",n:"Walk-in",m:"—",t:"Walk-in",l:"—",b:"—"},{i:"C-0148",n:"Hafiz Clinic",m:"0301-4455667",t:"Credit",l:"50,000.00",b:"38,420.00"},{i:"C-0212",n:"Nadia Pervaiz",m:"0322-1010101",t:"Regular",l:"5,000.00",b:"1,240.00"},{i:"C-0230",n:"Bashir Ahmed",m:"0345-2323232",t:"Credit",l:"10,000.00",b:"11,200.00 "+chip("OVER LIMIT","danger")}],{sel:1,click:"openCust"})+'</div>'+
+ '<div class="panel"><h2>Quick add customer</h2>'+field("c1","Name","")+field("c2","Mobile","",{ph:"03xx-xxxxxxx"})+field("c3","Type","Regular",{sel:["Regular","Credit"]})+field("c4","Credit limit","0.00",{n:1,hint:"Credit sales over the limit need a manager PIN"})+'<div class="row"><button class="btn" type="button" data-go="SCR-21">Open ledger</button><button class="btn pri" type="button">Save customer</button></div></div></section>'},
+ {empty:["No customers yet","Walk-in is always available. Add customers who buy on credit or want receipts by name."],error:"Mobile 0322-1010101 already belongs to Nadia Pervaiz (C-0212).",success:"Customer saved and selected for this sale."});
+
+/* SCR-21 Customer ledger */
+def("SCR-21","Customer ledger · Hafiz Clinic",[A,M,T],function(){return '<section class="stack" data-screen="SCR-21"><div class="kpis">'+kpi("Balance","38,420.00","Limit 50,000.00")+kpi("Oldest unpaid","26 days","SI-C5-260918-0233","warn")+kpi("This month","64,180.00","18 invoices")+kpi("Received","25,760.00","3 receipts")+'</div>'+
+ table([{l:"Date",k:"d"},{l:"Document",k:"n"},{l:"Details",k:"x"},{l:"Debit",k:"dr",n:1},{l:"Credit",k:"cr",n:1},{l:"Balance",k:"b",n:1}],[{d:"01-Oct",n:"—",x:"Opening (carried forward)",dr:"",cr:"",b:"28,360.00"},{d:"09-Oct",n:"SI-C5-261009-0102",x:"Credit sale",dr:"12,300.00",cr:"",b:"40,660.00"},{d:"12-Oct",n:"CR-261012-0011",x:"Receipt, cash",dr:"",cr:"10,000.00",b:"30,660.00"},{d:"13-Oct",n:"SR-C5-261013-0003",x:"Return credit note",dr:"",cr:"660.00",b:"30,000.00"},{d:"14-Oct",n:"SI-C5-261014-0477",x:"Credit sale",dr:"8,420.00",cr:"",b:"38,420.00"}])+'<div class="row" style="justify-content:flex-end"><button class="btn" type="button">Print statement</button><button class="btn acc" type="button" data-go="SCR-22">Receive payment</button></div></section>'},{empty:["No entries","This customer has no invoices, receipts or returns yet."],error:"Ledger failed to load. Retry.",success:"Statement printed."});
+
+/* SCR-22 Customer receipt */
+def("SCR-22","Customer receipt",[A,M,C,T],function(st){return '<section class="stack" data-screen="SCR-22"><div class="grid3">'+field("r1","Customer","Hafiz Clinic (C-0148)")+field("r2","Amount received","15,000.00",{n:1})+field("r3","Method","Cash",{sel:["Cash","Bank transfer","Card","Wallet"]})+field("r4","Reference","")+field("r5","Outstanding","38,420.00",{ro:1})+field("r6","Notes","")+'</div>'+
+ table([{l:"Invoice",k:"n"},{l:"Date",k:"d"},{l:"Outstanding",k:"o",n:1},{l:"Allocate",f:function(r){return'<input class="in n" style="width:120px" value="'+r.a+'" aria-label="Allocate to '+r.n+'">'}}],[{n:"SI-C5-260918-0233",d:"18-Sep",o:"17,700.00",a:"15,000.00"},{n:"SI-C5-261009-0102",d:"09-Oct",o:"12,300.00",a:"0.00"},{n:"SI-C5-261014-0477",d:"14-Oct",o:"8,420.00",a:"0.00"}],{foot:["","Allocated","15,000.00","Unallocated 0.00"]})+
+ (st==="error"?'<div class="banner danger">Allocated Rs 16,000.00 is more than the Rs 15,000.00 received. Reduce an allocation or leave the extra as customer credit.</div>':'<div class="row" style="justify-content:flex-end"><button class="btn pri" type="button">Post receipt and print</button></div>')+(st==="success"?'<div class="banner ok">CR-261014-0015 posted. Balance now 23,420.00.</div>':'')+'</section>'},{empty:["Choose a customer","Outstanding invoices appear here to allocate the receipt."]});
+
+/* SCR-23 Adjust & count */
+def("SCR-23","Adjust & count",[A,M,K],function(){var t=cur("adj","Stock count");
+ var cnt=table([{l:"Medicine",k:"m"},{l:"Batch",k:"b"},{l:"Rack",k:"r"},{l:"System",k:"s",n:1},{l:"Physical",f:function(r){return'<input class="in n" style="width:80px" value="'+r.p+'" aria-label="Physical count">'}},{l:"Difference",k:"d",n:1},{l:"Reason",k:"w"},{l:"Approval",k:"a"}],[{m:"Panadol 500 mg",b:"PN4417",r:"A-1",s:"212",p:"212",d:"0",w:"",a:""},{m:"Brufen 400 mg",b:"BF7710",r:"A-4",s:"1,860",p:"1,842",d:"−18",w:"Shortage",a:chip("WITHIN LIMIT","ok")},{m:"Arinac Forte",b:"AR5521",r:"A-6",s:"9",p:"4",d:"−5",w:"Shortage",a:chip("NEEDS MANAGER","warn")}]);
+ var adj='<div class="grid3">'+field("a1","Medicine","Calpol 120 mg/5 ml")+field("a2","Batch","CP3299")+field("a3","Reason","Damage",{sel:["Damage","Expiry","Breakage","Shortage","Correction","Stock count"]})+field("a4","System qty","3 btl",{ro:1})+field("a5","Physical qty","0",{n:1})+field("a6","Difference","−3 btl (Rs 432.00 at cost)",{ro:1})+'</div>'+field("a7","Notes","Bottles broken in delivery carton");
+ return '<section class="stack" data-screen="SCR-23">'+tabs("adj",["Stock count","Single adjustment","Write-off quarantine"])+(t==="Stock count"?'<div class="row"><span class="chip acc">COUNT SC-0012 · Rack A · system qty frozen 14-Oct 18:00</span></div>'+cnt:t==="Single adjustment"?adj:table([{l:"Batch",k:"b"},{l:"Medicine",k:"m"},{l:"Qty",k:"q",n:1},{l:"Value at cost",k:"v",n:1},{l:"Reason",k:"w"}],[{b:"FL1180",m:"Flagyl 400 mg",q:"18 strip",v:"756.00",w:"Expired, supplier refused"},{b:"AG2208",m:"Augmentin 625 mg",q:"4 strip",v:"1,404.40",w:"Expired"}]))+
+ '<div class="row" style="justify-content:flex-end"><button class="btn" type="button">Save draft</button><button class="btn pri" type="button">Submit for posting</button></div><p class="muted">Differences above Rs 1,000 or 5% of batch qty need manager approval. Each posted line creates a stock movement and an inventory journal entry.</p></section>'},
+ {empty:["No count in progress","Start a count by rack or category. System quantities are frozen when the count starts."],error:"Physical quantity cannot be negative.",success:"Adjustment SA-261014-0007 posted with Sana's approval."});
+
+/* SCR-24 Approvals */
+def("SCR-24","Approvals",[A,M,T],function(){return '<section class="stack" data-screen="SCR-24">'+table([{l:"Requested",k:"t"},{l:"By / PC",k:"b"},{l:"Type",k:"y"},{l:"Details",k:"d"},{l:"Amount",k:"a",n:1},{l:"",f:function(){return'<div class="row" style="flex-wrap:nowrap"><button class="btn" type="button">Reject</button><button class="btn acc" type="button">Approve</button></div>'}}],[{t:"19:40",b:"Asad · COUNTER-3",y:chip("DISCOUNT","warn"),d:"12% on SI draft (5 lines)",a:"136.68"},{t:"19:12",b:"Imran · STORE-PC",y:chip("ADJUSTMENT","warn"),d:"Arinac Forte AR5521 −5 strip, shortage",a:"480.00"},{t:"18:55",b:"Faraz · ACCOUNTS",y:chip("EXPENSE","warn"),d:"Generator diesel, EX draft",a:"6,500.00"}])+'<p class="muted">Approvals at the counter (manager PIN) do not wait here. This list holds requests the requester chose to send for later approval.</p></section>'},
+ {empty:["Nothing waiting for approval","Requests from counters and the store appear here with a badge in the menu."],error:"Approval failed: Sana does not have the 'Approve stock adjustments' permission.",success:"Approved. The requester was notified on COUNTER-3."});
+
+/* SCR-25 Cash & bank */
+def("SCR-25","Cash & bank",[A,M,T],function(){return '<section class="stack" data-screen="SCR-25"><div class="row">'+field("cb1","Account","Cash in hand",{sel:["Cash in hand","Meezan Bank current","Card settlement (Alfalah)","Easypaisa merchant"]})+field("cb2","Date","14-Oct-2026")+'<div class="stack" style="align-content:end"><button class="btn" type="button">Cash in / out</button></div><div class="stack" style="align-content:end"><button class="btn" type="button">Transfer</button></div></div>'+
+ table([{l:"Time",k:"t"},{l:"Document",k:"n"},{l:"Details",k:"x"},{l:"Receipt",k:"i",n:1},{l:"Payment",k:"o",n:1},{l:"Balance",k:"b",n:1}],[{t:"09:00",n:"—",x:"Opening balance",i:"",o:"",b:"64,200.00"},{t:"09:00–19:42",n:"742 sales",x:"Cash sales (summary)",i:"352,900.00",o:"",b:"417,100.00"},{t:"11:20",n:"CR-261014-0012",x:"Receipt, Bashir Ahmed",i:"2,000.00",o:"",b:"419,100.00"},{t:"14:05",n:"EX-261014-0003",x:"Expense, tea and refreshments",i:"",o:"1,200.00",b:"417,900.00"},{t:"16:30",n:"TR-261014-0001",x:"Deposit to Meezan Bank",i:"",o:"300,000.00",b:"117,900.00"},{t:"18:10",n:"SR-C3-261014-0008",x:"Refund, sales return",i:"",o:"412.00",b:"117,488.00"}],{cls:"ledger"})+'<p class="muted">Sales and purchases post their own cash lines. Nothing is entered twice, and supplier payments are not expenses.</p></section>'},{empty:["No movements in this account today","The opening balance carries over from yesterday's closing."],error:"Cashbook could not be loaded. Retry.",success:"Transfer TR-261014-0001 posted."});
+
+/* SCR-26 Expenses */
+def("SCR-26","Expenses",[A,M,T],function(){return '<section class="split" data-screen="SCR-26">'+table([{l:"Voucher",k:"n"},{l:"Date",k:"d"},{l:"Category",k:"c"},{l:"Description",k:"x"},{l:"Amount",k:"a",n:1},{l:"Approved by",k:"p"}],[{n:"EX-261014-0003",d:"14-Oct",c:"Staff welfare",x:"Tea and refreshments",a:"1,200.00",p:"—"},{n:"EX-261013-0002",d:"13-Oct",c:"Utilities",x:"LESCO bill Sep",a:"38,640.00",p:"Rehan"},{n:"EX-261012-0001",d:"12-Oct",c:"Repairs",x:"AC service",a:"4,500.00",p:"Sana"}])+
+ '<div class="panel"><h2>New expense voucher</h2>'+field("x1","Category","Fuel",{sel:["Fuel","Utilities","Rent","Salaries","Repairs","Staff welfare"]})+field("x2","Description","Generator diesel 25 L")+field("x3","Amount","6,500.00",{n:1})+field("x4","Paid from","Cash in hand",{sel:["Cash in hand","Meezan Bank current"]})+field("x5","Reference","Receipt 7741")+'<button class="btn pri" type="button">Post voucher</button><span class="hint muted">Above Rs 5,000 needs approval.</span></div></section>'},{empty:["No expenses this month","Record rent, salaries, utilities and other running costs here."],error:"Amount is required and must be more than zero.",success:"EX-261014-0004 posted."});
+
+/* SCR-27 Closing */
+def("SCR-27","Cashier & day closing",[A,M,C,T],function(st){var den=[[5000,8],[1000,18],[500,9],[100,14],[50,6],[20,4],[10,4],[5,1],[2,1],[1,1]];var tot=den.reduce(function(a,d){return a+d[0]*d[1]},0);
+ return '<section class="grid2" data-screen="SCR-27"><div class="panel"><h2>Count the drawer · Asad · Counter 3</h2>'+table([{l:"Note / coin",f:function(d){return"Rs "+d[0]}},{l:"Count",f:function(d){return'<input class="in n" style="width:80px" value="'+d[1]+'" aria-label="Count of Rs '+d[0]+'">'}},{l:"Amount",n:1,f:function(d){return money(d[0]*d[1])}}],den,{foot:["Counted","",money(tot)]})+'</div>'+
+ '<div class="stack"><div class="panel sums"><h2>Expected cash</h2><div class="rw"><span>Opening float</span><span>5,000.00</span></div><div class="rw"><span>Cash sales</span><span>58,240.00</span></div><div class="rw"><span>Customer receipts (cash)</span><span>2,000.00</span></div><div class="rw"><span>Refunds paid</span><span>− 412.00</span></div><div class="rw"><span>Paid out</span><span>0.00</span></div><div class="rw"><b>Expected</b><b class="num">64,828.00</b></div><div class="rw"><b>Counted</b><b class="num">'+money(tot)+'</b></div><div class="rw"><b>Difference</b><b class="num" style="color:var(--c-danger)">'+money(tot-64828)+'</b></div></div>'+
+ '<div class="panel">'+field("cl1","Reason for difference","Short Rs "+money(64828-tot)+", change given wrongly at 19:05")+'<button class="btn pri" type="button">Close shift (needs manager PIN)</button></div>'+(st==="success"?'<div class="banner ok">Shift closed. Day 14-Oct-2026 closed by Sana; postings for this date now need approval.</div>':'')+(st==="error"?'<div class="banner danger">The day cannot be closed: counters 2 and 6 still have open shifts.</div>':'')+'</div></section>'},{empty:["No open shift","Open a shift with the opening float before the first sale."]});
+
+/* SCR-28 Reports */
+def("SCR-28","Reports",[A,M,C,K,T],function(){var cat=[["Sales","Daily sales","Sales summary","Item-wise sales","Sales returns","Discount report","Cashier closing"],["Profit","Profit report (net sales, COGS, gross & operating profit)"],["Stock","Current stock","Stock valuation","Batch / expiry","Near-expiry","Expired / quarantine","Low stock","Stock movement"],["Purchases","Purchase report","Purchase returns"],["Accounts","Customer ledger","Customer outstanding","Supplier ledger","Supplier outstanding","Cashbook","Bankbook","Expense report"],["Admin","Audit report","Backup report","Controlled register"]];
+ return '<section class="grid2" style="grid-template-columns:300px 1fr" data-screen="SCR-28"><div class="panel">'+cat.map(function(g){return'<h2>'+g[0]+'</h2>'+g.slice(1).map(function(r){return'<a href="#SCR-28" class="muted" style="display:block;padding:2px 0;color:'+(r==="Daily sales"?"var(--c-accent)":"var(--c-ink)")+';font-weight:'+(r==="Daily sales"?"700":"400")+'">'+esc(r)+'</a>'}).join("")}).join("")+'</div>'+
+ '<div class="stack"><div class="row">'+field("rp1","From","14-Oct-2026")+field("rp2","To","14-Oct-2026")+field("rp3","Cashier","All",{sel:["All","Asad","Hina","Usman","Bilal"]})+field("rp4","Payment","All",{sel:["All","Cash","Card","Wallet","Credit"]})+'<div class="stack" style="align-content:end"><button class="btn acc" type="button">Run</button></div></div>'+
+ '<div class="row"><span class="chip acc">POSTED ONLY</span><span class="muted">742 invoices · generated 19:43 in 1.2 s</span><span style="flex:1"></span><button class="btn" type="button">Print A4</button><button class="btn" type="button">Export CSV</button><button class="btn" type="button">Export Excel</button></div>'+
+ table([{l:"Invoice",k:"n"},{l:"Time",k:"t"},{l:"Cashier",k:"c"},{l:"Customer",k:"u"},{l:"Payment",k:"p"},{l:"Total",k:"a",n:1}],[{n:"SI-C3-261014-0481",t:"19:38",c:"Asad",u:"Walk-in",p:"Cash",a:"640.00"},{n:"SI-C5-261014-0477",t:"19:36",c:"Hina",u:"Hafiz Clinic",p:"Credit",a:"8,420.00"},{n:"SI-C1-261014-0470",t:"19:30",c:"Usman",u:"Walk-in",p:"Split",a:"2,310.00"},{n:"SI-C2-261014-0451",t:"18:58",c:"Bilal",u:"Nadia Pervaiz",p:"Card",a:"1,240.00"}],{foot:["742 invoices","","","","","497,325.00"],h:300})+'</div></section>'},
+ {empty:["No data for these filters","Posted transactions only. Drafts never appear in reports."],error:"The report took longer than 30 s and was stopped. Narrow the date range; for a full year, run it after closing hours.",success:"Exported daily-sales-2026-10-14.csv (742 rows)."});
+
+/* SCR-29 Users */
+def("SCR-29","Users & roles",[A],function(){var perms=["POS: sell","POS: discount up to limit","Approve discounts","Approve refunds","Post purchases","Post stock adjustments","Approve adjustments","View cost and margin","Accounts: post vouchers","Reports: export","Backup","Restore","Manage users"];var m={Admin:"1111111111111",Manager:"1111111111110",Cashier:"1100000000000",Accountant:"0000000011100",Stock:"0000110000100"};
+ return '<section class="stack" data-screen="SCR-29">'+tabs("usr",["Users","Roles and permissions"])+(cur("usr","Users")==="Users"?table([{l:"Name",k:"n"},{l:"Username",k:"u"},{l:"Role",k:"r"},{l:"Status",k:"s"},{l:"Last login",k:"l"},{l:"Timeout",k:"t"},{l:"",f:function(){return'<button class="btn" type="button">Reset password</button>'}}],[{n:"Rehan Malik",u:"rehan",r:"Administrator",s:chip("ACTIVE","ok"),l:"14-Oct 08:52 · OWNER-PC",t:"10 min"},{n:"Sana Iqbal",u:"sana",r:"Pharmacist / Manager",s:chip("ACTIVE","ok"),l:"14-Oct 09:01 · COUNTER-1",t:"10 min"},{n:"Asad Raza",u:"asad",r:"Cashier",s:chip("ACTIVE","ok"),l:"14-Oct 08:58 · COUNTER-3",t:"5 min"},{n:"Imran Ali",u:"imran",r:"Stock operator",s:chip("ACTIVE","ok"),l:"14-Oct 10:15 · STORE-PC",t:"10 min"},{n:"Kashif Noor",u:"kashif",r:"Cashier",s:chip("INACTIVE"),l:"02-Sep 22:40",t:"5 min"}]):
+ '<div class="tbl"><table class="g matrix"><thead><tr><th>Permission</th>'+Object.keys(m).map(function(k){return'<th>'+k+'</th>'}).join("")+'</tr></thead><tbody>'+perms.map(function(p,i){return'<tr><td>'+p+'</td>'+Object.keys(m).map(function(k){var on=m[k][i]==="1";return'<td><input type="checkbox" aria-label="'+k+': '+p+'" '+(on?"checked":"")+(k==="Admin"?" disabled":"")+'></td>'}).join("")+'</tr>'}).join("")+'</tbody></table></div><p class="muted">Changes apply at each user\'s next request; the server checks them on every action. Every change is audited.</p>')+'</section>'},
+ {empty:["Only the administrator exists","Add a user for every person. Never share logins between staff."],error:"Username 'asad' is already taken.",success:"Password reset. Asad must choose a new password at next login."});
+
+/* SCR-30 Audit */
+def("SCR-30","Audit log",[A,T,M],function(){return '<section class="stack" data-screen="SCR-30"><div class="row">'+field("au1","From","14-Oct-2026")+field("au2","Action","All sensitive",{sel:["All sensitive","Login","Discount override","Price change","Reversal","Stock adjustment","Backup / restore","Permission change"]})+field("au3","User","All",{sel:["All","Rehan","Sana","Asad","Imran","Faraz"]})+'<div class="stack" style="align-content:end"><button class="btn" type="button">Export CSV</button></div></div>'+
+ table([{l:"Time",k:"t"},{l:"User / PC",k:"u"},{l:"Action",k:"a"},{l:"Record",k:"r"},{l:"Before → after",k:"c"},{l:"Reason / approver",k:"w"}],[{t:"19:40:12",u:"Asad · COUNTER-3",a:chip("DISCOUNT OVERRIDE","warn"),r:"Draft cart 7c1e…",c:"0% → 12%",w:"Senior citizen · Sana"},{t:"19:02:44",u:"Sana · COUNTER-1",a:chip("REVERSAL","danger"),r:"SI-C3-261014-0455",c:"POSTED → REVERSED",w:"Wrong medicine billed"},{t:"16:11:09",u:"Sana · COUNTER-1",a:chip("PRICE CHANGE"),r:"M-00087 Augmentin 625",c:"398.00 → 412.00",w:"New MRP from supplier"},{t:"09:01:15",u:"sana · COUNTER-1",a:chip("LOGIN","ok"),r:"—",c:"",w:""},{t:"08:57:31",u:"asad · COUNTER-3",a:chip("LOGIN FAILED","danger"),r:"—",c:"attempt 1 of 5",w:""},{t:"03:00:02",u:"system · PHARM-HOST",a:chip("BACKUP","ok"),r:"auto-20261014-0300.mcbak",c:"412 MB · verified",w:""}])+'</section>'},{empty:["No audit entries match","Change the filters."],error:"Audit log failed to load. Retry.",success:"Exported audit-2026-10-14.csv."});
+
+/* SCR-31 Backup */
+def("SCR-31","Backup & restore",[A,M],function(st){var admin=S.role==="admin";
+ return '<section class="stack" data-screen="SCR-31"><div class="kpis">'+kpi("Last automatic","03:00 today","412 MB · integrity OK")+kpi("Last USB copy","13-Oct 23:10","KINGSTON 32 GB","warn")+kpi("Kept on host","30 daily + 24 hourly","D:\\MediCareData\\Backups")+kpi("Recovery point","≤ 1 hour","Hourly snapshots on host")+'</div>'+
+ '<div class="grid2"><div class="panel"><h2>Back up to USB now</h2>'+field("bk1","Destination","E:\\ KINGSTON 32 GB · 21.4 GB free",{sel:["E:\\ KINGSTON 32 GB · 21.4 GB free","F:\\ SANDISK 16 GB · 0.3 GB free"]})+'<div class="prog" aria-label="Backup progress"><i id="bkp"></i></div><div id="bkmsg" class="muted">Ready. The file will be named medicare-20261014-1943.mcbak. Existing backups are never overwritten.</div><div class="row"><button class="btn pri" type="button" data-act="backup">Back up now</button><button class="btn" type="button">Open destination</button></div></div>'+
+ '<div class="panel"><h2>Restore</h2>'+(admin?'<p>Restoring replaces the live database with a backup. All counters are logged out, a safety copy is made first, and sales made after the backup time are not in the restored data.</p>'+field("rs1","Backup file","auto-20261014-0300.mcbak · 03:00 today · verified",{sel:["auto-20261014-0300.mcbak · 03:00 today · verified","usb-20261013-2310.mcbak · 13-Oct 23:10 · verified"]})+field("rs2","Your administrator password","",{type:"password"})+field("rs3","Type RESTORE to confirm","",{ph:"RESTORE"})+'<button class="btn danger" type="button">Restore this backup</button>':'<div class="banner info">Only the administrator can restore. Managers can make backups.</div>')+'</div></div>'+
+ table([{l:"Time",k:"t"},{l:"Type",k:"y"},{l:"Destination",k:"d"},{l:"Size",k:"s",n:1},{l:"Result",k:"r"},{l:"Verification",k:"v"}],[{t:"14-Oct 03:00",y:"Automatic daily",d:"D:\\MediCareData\\Backups",s:"412 MB",r:chip("OK","ok"),v:"integrity_check ok · SHA-256 match"},{t:"14-Oct 19:00",y:"Automatic hourly",d:"D:\\MediCareData\\Backups\\hourly",s:"412 MB",r:chip("OK","ok"),v:"quick_check ok"},{t:"13-Oct 23:10",y:"Manual USB",d:"E:\\",s:"411 MB",r:chip("OK","ok"),v:"integrity_check ok"},{t:"11-Oct 23:05",y:"Manual USB",d:"F:\\",s:"—",r:chip("FAILED","danger"),v:"Not enough space on F:\\ (0.3 GB free, 0.5 GB needed)"}])+
+ (st==="error"?'<div class="banner danger">Backup failed: the USB drive E:\\ was removed during copying. Nothing was overwritten. Insert the drive and try again.</div>':'')+(st==="success"?'<div class="banner ok">Backup medicare-20261014-1943.mcbak written to E:\\ and verified (integrity ok, SHA-256 match).</div>':'')+'</section>'},{empty:["No backups yet","The first automatic backup runs tonight at 03:00. Make a USB backup now to be safe."]});
+
+/* SCR-32 Settings */
+def("SCR-32","Settings",[A],function(){var t=cur("set","Pharmacy");var c;
+ if(t==="Pharmacy")c='<div class="grid2">'+field("st1","Pharmacy name","MediCare Pharmacy")+field("st2","Drug sale licence no.","owner to supply",{hint:"Printed on receipts"})+field("st3","Address","owner to supply")+field("st4","Telephone","owner to supply")+field("st5","NTN","optional")+field("st6","Currency","PKR · Rs · 2 decimals",{ro:1})+'</div>';
+ else if(t==="Numbering")c='<div class="grid2">'+field("sn1","Sale invoice","SI-{counter}-{yyMMdd}-{seq:4}")+field("sn2","Purchase invoice","PI-{yyMMdd}-{seq:4}")+field("sn3","Sales return","SR-{counter}-{yyMMdd}-{seq:4}")+field("sn4","Receipt","CR-{yyMMdd}-{seq:4}")+'</div><p class="muted">Numbers are assigned by the host when a document is posted, so two counters can never get the same number.</p>';
+ else if(t==="Thresholds")c='<div class="grid3">'+field("sh1","Near-expiry alert (days)","90",{n:1})+field("sh2","Max discount: cashier %","5",{n:1})+field("sh3","Max discount: manager %","10",{n:1})+field("sh4","Refund approval above","500.00",{n:1})+field("sh5","Adjustment approval above","1,000.00",{n:1})+field("sh6","Expense approval above","5,000.00",{n:1})+field("sh7","Session lock after (min)","5",{n:1})+field("sh8","Failed logins before lock","5",{n:1})+field("sh9","Allow negative stock","No (recommended)",{sel:["No (recommended)"]})+'</div>';
+ else if(t==="Receipt")c='<div class="grid2"><div class="stack">'+field("sr1","Paper","80 mm",{sel:["80 mm","58 mm","A4"]})+field("sr2","Urdu font","Noto Naskh Arabic",{sel:["Noto Naskh Arabic","Noto Nastaliq Urdu"]})+field("sr3","Urdu footer line 1","دوائی کی واپسی یا تبدیلی صرف بل کے ساتھ ۷ دن کے اندر")+field("sr4","Show batch and expiry","On request only",{sel:["On request only","Always"]})+'</div><div class="receipt"><div style="text-align:center;font-weight:700">MediCare Pharmacy</div><div class="l"><span>Panadol 500mg 2 strip</span><span>68.00</span></div><div class="ur">پیناڈول ۵۰۰</div><div class="l"><b>NET Rs</b><b>1,100.00</b></div><div class="ur" style="text-align:center">دوائی کی واپسی یا تبدیلی صرف بل کے ساتھ ۷ دن کے اندر</div></div></div>';
+ else if(t==="Shortcuts")c=table([{l:"Action",k:"a"},{l:"Key",f:function(r){return'<input class="in" style="width:90px" value="'+r.k+'" aria-label="Key for '+r.a+'">'}}],[{a:"Search medicine",k:"F2"},{a:"Select customer",k:"F3"},{a:"Payment",k:"F4"},{a:"Hold / recall",k:"F5"},{a:"Discount",k:"F6"},{a:"Choose batch",k:"F7"},{a:"Reprint",k:"F8"},{a:"Return",k:"F9"}]);
+ else c='<div class="grid2">'+field("sl1","Host address","192.168.1.10")+field("sl2","Port","8443",{n:1})+field("sl3","Certificate fingerprint","SHA-256 7F:3A:9C:…:E1:04",{ro:1})+field("sl4","Allowed network","192.168.1.0/24")+'</div>';
+ return '<section class="stack" data-screen="SCR-32">'+tabs("set",["Pharmacy","Numbering","Thresholds","Receipt","Shortcuts","LAN & security"])+c+'<div class="row" style="justify-content:flex-end"><button class="btn pri" type="button">Save settings</button></div><p class="muted">Posted documents keep the prices, discounts, tax rates and unit conversions in force when they were posted.</p></section>'},{error:"Port 8443 is in use by another program on the host. Choose another port.",success:"Settings saved. Counters pick them up within 30 seconds."});
+
+/* SCR-33 Connection */
+def("SCR-33","Connection & host",ALL,function(st){
+ return '<section class="grid2" data-screen="SCR-33"><div class="panel"><h2>Connect this PC to the host</h2>'+field("cn1","Host address","192.168.1.10",{hint:"Shown on the host monitor on PHARM-HOST"})+field("cn2","Port","8443",{n:1})+'<div class="banner info">Fingerprint from host: 7F:3A:9C:04 … 5B:E1:04. Check that it matches the host monitor screen, then confirm.</div><div class="row"><button class="btn" type="button">Test connection</button><button class="btn pri" type="button">Confirm and connect</button></div>'+(st==="error"?'<div class="banner danger">The fingerprint does not match the one saved for PHARM-HOST. Do not continue. Ask the administrator; someone may have replaced the host certificate.</div>':'')+'</div>'+
+ '<div class="panel"><h2>Host monitor · PHARM-HOST</h2><div class="banner ok">Service running · port 8443 · up 6 d 4 h</div>'+table([{l:"Workstation",k:"w"},{l:"OS / client",k:"o"},{l:"User",k:"u"},{l:"Last seen",k:"l"}],[{w:"COUNTER-1",o:"Win 11 · .NET 10",u:"Sana",l:"now"},{w:"COUNTER-3",o:"Win 7 SP1 · .NET Fw 4.8",u:"Asad",l:"now"},{w:"COUNTER-5",o:"Win 10 · .NET 10",u:"Hina",l:"2 s"},{w:"STORE-PC",o:"Win 7 SP1 · .NET Fw 4.8",u:"Imran",l:"40 s"}])+'<p class="muted">Database D:\\MediCareData\\medicare.db · WAL · 412 MB. Firewall rule "MediCare Host 8443" allows 192.168.1.0/24 only.</p></div></section>'},{});
+
+/* SCR-34 Setup */
+def("SCR-34","First-run setup",[A],function(){return '<section class="stack" data-screen="SCR-34" style="max-width:720px;margin:0 auto"><div class="steps"><span class="done">1. Pharmacy</span><span class="on">2. Administrator</span><span>3. Backups</span><span>4. Finish</span></div><div class="panel"><h3>Create the administrator</h3><p class="muted">There are no built-in passwords. This person can manage users, settings, backups and restore.</p><div class="grid2">'+field("su1","Full name","Rehan Malik")+field("su2","Username","rehan")+field("su3","Password","",{type:"password",hint:"At least 10 characters; not the username"})+field("su4","Confirm password","",{type:"password"})+field("su5","Approval PIN (4-6 digits)","",{type:"password",hint:"Used to approve at counters"})+'</div><div class="row" style="justify-content:flex-end"><button class="btn" type="button">Back</button><button class="btn pri" type="button">Next: backups</button></div></div></section>'},{bare:true,error:"Passwords do not match.",success:"Setup complete. Log in as rehan to add users and settings."});
+
+/* SCR-35 Controlled register */
+def("SCR-35","Controlled register",[A,M],function(){return '<section class="stack" data-screen="SCR-35"><div class="row">'+field("cr1","From","01-Oct-2026")+field("cr2","To","14-Oct-2026")+field("cr3","Schedule","B and D",{sel:["B and D","B","D"]})+'<div class="stack" style="align-content:end"><button class="btn" type="button">Print register (A4)</button></div></div>'+
+ table([{l:"Serial",k:"s"},{l:"Date",k:"d"},{l:"Prescriber",k:"p"},{l:"Patient",k:"pt"},{l:"Drug / manufacturer",k:"m"},{l:"Batch",k:"b"},{l:"Qty sold",k:"q",n:1},{l:"Qty purchased",k:"qp",n:1},{l:"Balance",k:"bl",n:1},{l:"Dispensed by",k:"by"}],[{s:"B-0141",d:"12-Oct-2026",p:"Dr. Ayesha Khan (PMDC 45612-P)",pt:"Tariq Mehmood",m:"Xanax 0.5 mg · Pfizer",b:"XN0412",q:"2 strip",qp:"",bl:"22 strip",by:"Sana Iqbal"},{s:"B-0140",d:"09-Oct-2026",p:"Dr. Ayesha Khan (PMDC 45612-P)",pt:"Tariq Mehmood",m:"Xanax 0.5 mg · Pfizer",b:"XN0412",q:"2 strip",qp:"",bl:"24 strip",by:"Sana Iqbal"},{s:"—",d:"02-Oct-2026",p:"",pt:"",m:"Xanax 0.5 mg · Pfizer",b:"XN0412",q:"",qp:"30 strip",bl:"26 strip",by:"PI-261002-0018"}])+'<p class="muted">Entries are created when a Schedule B or D medicine is sold, with the prescriber and patient captured at the counter. Write the serial number on the prescription. Format to be confirmed by the pharmacist-in-charge.</p></section>'},{empty:["No controlled sales in this period","Mark medicines as Schedule B or D in the medicine editor to start the register."],error:"Register failed to load. Retry.",success:"Register printed."});
+
+/* ================= shell ================= */
+var IDS=Object.keys(SCR).sort();
+var sel=document.getElementById("pScreen");
+IDS.forEach(function(id){var o=document.createElement("option");o.value=id;o.textContent=id+" · "+SCR[id].title;sel.appendChild(o)});
+function allowed(id){return SCR[id].roles.indexOf(S.role)>=0}
+function navHtml(){var h='<aside class="nav" aria-label="Main menu"><div class="brand"><span class="cross"></span>MediCare</div>';
+ NAV.forEach(function(g){var items=g[1].filter(function(it){return allowed(it[0])});if(!items.length)return;h+='<div class="grp">'+g[0]+'</div>';items.forEach(function(it){h+='<a href="#'+it[0]+'" class="'+(S.screen===it[0]||(SCR[S.screen].bg===it[0])?"on":"")+'">'+it[1]+(it[0]==="SCR-24"?'<span class="badge">3</span>':'')+'</a>'})});
+ return h+'<span class="grow"></span><a href="#SCR-33">Connection</a><a href="#SCR-01">Log out</a></aside>'}
+function stateWrap(sc,st,inner){
+ if(st==="loading")return '<section class="stack" data-screen="'+sc.id+'" aria-busy="true"><div class="skel" style="width:40%"></div>'+Array(8).join('<div class="skel"></div>')+'<span class="muted">Loading from PHARM-HOST…</span></section>';
+ if(st==="empty"&&sc.empty)return '<section class="empty" data-screen="'+sc.id+'"><h3>'+sc.empty[0]+'</h3><p>'+sc.empty[1]+'</p></section>';
+ if(st==="error"&&sc.error)return '<section class="stack" data-screen="'+sc.id+'"><div class="banner danger">'+sc.error+'<span class="sp"></span><button class="btn" type="button" data-act="retry">Retry</button></div></section>';
+ if(st==="success"&&sc.success)return '<div class="banner ok" style="margin-bottom:var(--s-3)">'+sc.success+'</div>'+inner;
+ return inner}
+function render(){
+ var sc=SCR[S.screen],app=document.getElementById("app"),st=S.state;
+ if(!allowed(S.screen)){app.className="app";app.innerHTML=navHtml()+header(sc)+'<main class="main"><section class="empty" data-screen="'+sc.id+'"><h3>You do not have access to '+esc(sc.title)+'</h3><p>'+ROLE_LABEL[S.role]+' accounts cannot open this screen. The host refuses the request even if the menu is bypassed. Ask an administrator to grant access.</p></section></main>'+statusHtml();return}
+ if(sc.bare){app.className="app bare";app.innerHTML=stateWrap(sc,sc.id==="SCR-01"&&(st==="error"||st==="success")?"normal":st,sc.render(st));bindAll();return}
+ var bg=sc.dialog?SCR[sc.bg]:sc;
+ app.className="app"+(bg.pos?" pos":"");
+ var body=sc.dialog?bg.render("normal"):stateWrap(sc,st,sc.render(st));
+ if(sc.dialog&&st==="loading")body+='';
+ app.innerHTML=navHtml()+header(bg)+'<main class="main" id="main">'+body+'</main>'+statusHtml()+(sc.dialog?'<div class="scrim">'+(st==="loading"?'<div class="dlg" data-screen="'+sc.id+'"><div class="skel"></div><div class="skel"></div><span class="muted">Posting… do not close this window.</span></div>':sc.render(st))+'</div>':'')+(S.dlg?'<div class="scrim">'+S.dlg+'</div>':'')+(S.toast?'<div class="toast"><div class="banner '+S.toast[1]+'">'+S.toast[0]+'</div></div>':'');
+ bindAll();
+ var f=document.querySelector(".scrim input, .scrim select")||document.getElementById("scanIn")||document.getElementById("ginScan");if(f&&!S.noFocus)f.focus();S.noFocus=false}
+function header(sc){var pos=sc.pos;return '<header class="top"><h1>'+esc(sc.title)+'</h1>'+(pos?'<div class="kv"><small>Invoice</small><span class="num">SI-C3-261014-0'+S.invNo+'</span></div><div class="kv"><small>Customer</small><span>Walk-in</span></div><div class="kv"><small>Counter</small><span>3</span></div><span class="chip">HELD 2</span>':'')+'<span class="sp"></span><div class="kv"><small>14-Oct-2026</small><span class="num">19:42</span></div><div class="user"><span class="avatar">'+ROLES[S.role].charAt(0)+'</span><div class="kv"><span>'+ROLES[S.role]+'</span><small>'+ROLE_LABEL[S.role]+'</small></div></div></header>'}
+function statusHtml(){return S.host?'<footer class="status"><span><span class="dot"></span>Connected to PHARM-HOST · 12 ms</span><span>Shift open since 09:00</span><span class="sp"></span><span>Backup 03:00 verified</span><span>Self-check passed</span><span>v1.0.0</span></footer>':'<footer class="status down" role="alert"><span><span class="dot"></span>Host PHARM-HOST unreachable since 19:42:10 · retrying every 5 s</span><span class="sp"></span><span>Read-only. Nothing can be posted until the host is back.</span></footer>'}
+function openDlg(kind){if(kind==="hostdown")S.dlg='<div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="hdT" data-screen="SCR-33"><h2 id="hdT">Host PHARM-HOST unreachable</h2><p>This sale is <b>not saved yet</b>. It is kept on this PC as a draft (5 lines, Rs '+money(totals().net)+'). When the host is back, press Retry and it will be posted once.</p><p class="muted">Do not hand over medicines for unsaved sales. If the host stays down, use the paper emergency book and enter those sales later with manager approval.</p><div class="foot"><button class="btn" type="button" data-act="closeDlg">Keep waiting</button><button class="btn pri" type="button" data-act="retryHost">Retry now</button></div></div>';
+ else if(kind==="disc")S.dlg='<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dsT"><h2 id="dsT">Invoice discount</h2>'+field("dsP","Discount %","12",{n:1,hint:"Your limit: "+DISC_LIMIT[S.role]+"%"})+'<div class="foot"><button class="btn" type="button" data-act="closeDlg">Cancel</button><button class="btn pri" type="button" data-act="applyDisc">Apply</button></div></div>';
+ render()}
+function go(id){S.dlg=null;S.toast=null;S.screen=id;sel.value=id;if(location.hash.slice(1)!==id)location.hash=id;render()}
+function toast(t,k){S.toast=[t,k];render();setTimeout(function(){S.toast=null;S.noFocus=false;render()},3500)}
+
+/* ================= events ================= */
+function bindAll(){
+ var si=document.getElementById("scanIn");if(si)si.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();var v=si.value;si.value="";scan(v)}});
+ var gi=document.getElementById("ginScan");if(gi)gi.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();var g=gs1(gi.value);gi.value="";var m=document.getElementById("ginmsg");m.innerHTML=g?chip("2D","info")+" GTIN "+g["01"]+" · batch "+(g["10"]||"?")+" · expiry "+(g["17"]?g["17"].slice(2,4)+"/20"+g["17"].slice(0,2):"?")+" → added to line for Risek 20 mg":chip("STOP","danger")+" Not a GS1 code. Scan the 2D code on the box, or type the medicine name."}});
+ var mq=document.getElementById("mq");if(mq)mq.addEventListener("input",function(){S.medq=mq.value;S.noFocus=true;render();var n=document.getElementById("mq");n.focus();n.setSelectionRange(n.value.length,n.value.length)});
+ var tend=document.getElementById("tend");if(tend)tend.addEventListener("input",function(){S.tendered=tend.value;render();var n=document.getElementById("tend");n.focus();n.setSelectionRange(n.value.length,n.value.length)});
+ var lf=document.getElementById("loginForm");if(lf){lf.addEventListener("submit",function(e){e.preventDefault();var u=document.getElementById("lu").value.trim(),p=document.getElementById("lp").value,msg=document.getElementById("loginMsg");S.fails=S.fails||0;
+  if(!u||!p){msg.innerHTML='<span class="err">Enter both username and password.</span>';return}
+  if(p!=="demo"){S.fails++;msg.innerHTML='<span class="err">'+(S.fails>=5?"Account locked for 15 minutes after 5 wrong attempts. An administrator can unlock it.":"Username or password is wrong. "+(5-S.fails)+" attempts left.")+'</span>';return}
+  S.fails=0;go(S.role==="cashier"?"SCR-04":"SCR-03")});
+  document.getElementById("lpShow").addEventListener("click",function(){var p=document.getElementById("lp"),sh=p.type==="password";p.type=sh?"text":"password";this.textContent=sh?"Hide":"Show";this.setAttribute("aria-pressed",String(sh))})}
+}
+document.addEventListener("click",function(e){var t=e.target.closest("[data-go],[data-act],[data-tab],[data-pay],[data-scan]");if(!t)return;
+ if(t.dataset.scan){if(S.screen!=="SCR-04")go("SCR-04");setTimeout(function(){scan(t.dataset.scan)},0);return}
+ if(t.dataset.go){e.preventDefault();go(t.dataset.go);return}
+ if(t.dataset.tab){S.tab[t.dataset.tab]=t.dataset.v;render();return}
+ if(t.dataset.pay){S.pay=t.dataset.pay;render();return}
+ var a=t.dataset.act;act(a,t)});
+function act(a,t){
+ if(a==="selLine"){S.sel=parseInt(t.dataset.i,10);render()}
+ else if(a==="pay"){if(!S.host){openDlg("hostdown");return}if(!S.cart.length){say("Add at least one medicine before taking payment.","danger");return}S.state="normal";go("SCR-05")}
+ else if(a==="batch"){go("SCR-06")}
+ else if(a==="disc"){openDlg("disc")}
+ else if(a==="applyDisc"){var p=parseFloat(document.getElementById("dsP").value)||0;S.dlg=null;if(p>DISC_LIMIT[S.role]){go("SCR-07")}else{S.disc=Math.round(totals().gross*p)/100;render();say("Discount "+p+"% applied.","ok")}}
+ else if(a==="approve"){S.disc=136.68;go("SCR-04");setTimeout(function(){toast("Discount 12% approved by Sana · recorded in audit log","ok")},0)}
+ else if(a==="hold"){go("SCR-08")}
+ else if(a==="find"){var s=document.getElementById("scanIn");if(s){s.focus();say("Type at least 3 letters of the name or generic, then Enter.","ok")}}
+ else if(a==="cust"){go("SCR-20")}
+ else if(a==="reprint"){toast("Duplicate receipt printed · marked DUPLICATE · logged","ok")}
+ else if(a==="ret"){go("SCR-09")}
+ else if(a==="del"){if(S.cart.length){S.cart.splice(S.sel,1);S.sel=Math.max(0,S.sel-1);render()}}
+ else if(a==="cancel"){S.cart=[];S.disc=0;render();say("Sale cancelled. Nothing was posted.","ok")}
+ else if(a==="closeDlg"){S.dlg=null;if(SCR[S.screen].dialog)go(SCR[S.screen].bg);else render()}
+ else if(a==="complete"){t.disabled=true;t.innerHTML="Posting…";setTimeout(function(){var n=S.invNo;S.invNo++;S.cart=[];S.disc=0;S.pay="cash";S.tendered="1500";go("SCR-04");setTimeout(function(){toast("Sale SI-C3-261014-0"+n+" posted · receipt printed · ready for next customer","ok")},0)},700)}
+ else if(a==="retryHost"){if(S.host){S.dlg=null;render();toast("Reconnected. Draft posted once as SI-C3-261014-0"+S.invNo+".","ok")}else{S.dlg=null;openDlg("hostdown")}}
+ else if(a==="impNext"){S.importStep=Math.min(3,S.importStep+1);render()}
+ else if(a==="impDry"){toast("Dry run: 4,798 would be created, nothing saved.","ok")}
+ else if(a==="postPI"){toast("Posted PI-261014-0031 · payable Rs 32,068.40","ok")}
+ else if(a==="saveMed"){toast("Medicine saved · price change audited","ok")}
+ else if(a==="approveRefund"){toast("Refund above Rs 500: manager PIN requested on this PC","warn")}
+ else if(a==="backup"){var b=document.getElementById("bkp"),m=document.getElementById("bkmsg"),w=0;t.disabled=true;var iv=setInterval(function(){w+=20;b.style.width=w+"%";m.textContent=w<100?"Copying… "+w+"% (online backup, counters keep working)":"Verifying…";if(w>=100){clearInterval(iv);setTimeout(function(){m.textContent="Done: medicare-20261014-1943.mcbak · 412 MB · integrity ok · SHA-256 match";t.disabled=false},500)}},300)}
+ else if(a==="retry"){S.state="normal";document.getElementById("pState").value="normal";render()}
+ else if(a==="openMed"){go("SCR-12")}
+ else if(a==="openSup"||a==="openCust"){}
+ else if(a==="pickBatch"){}
+}
+document.addEventListener("keydown",function(e){
+ if(SCR[S.screen].pos||SCR[S.screen].bg==="SCR-04"){
+  var map={F2:"find",F3:"cust",F4:"pay",F5:"hold",F6:"disc",F7:"batch",F8:"reprint",F9:"ret"};
+  if(map[e.key]&&!SCR[S.screen].dialog&&!S.dlg){e.preventDefault();act(map[e.key],e.target);return}
+  if(e.key==="Escape"&&(SCR[S.screen].dialog||S.dlg)){e.preventDefault();act("closeDlg",e.target);return}
+  if(e.key==="Enter"&&S.screen==="SCR-05"&&e.target.id!=="tend"){var b=document.querySelector('[data-act="complete"]');if(b&&!b.disabled){e.preventDefault();act("complete",b)}}
+  if(e.key==="Enter"&&S.screen==="SCR-05"&&e.target.id==="tend"){var c=document.querySelector('[data-act="complete"]');if(c&&!c.disabled){e.preventDefault();act("complete",c)}}
+  if(S.screen==="SCR-04"&&!S.dlg&&(e.key==="ArrowDown"||e.key==="ArrowUp")&&S.cart.length){e.preventDefault();S.sel=Math.max(0,Math.min(S.cart.length-1,S.sel+(e.key==="ArrowDown"?1:-1)));render()}
+  if(S.screen==="SCR-04"&&e.key==="Delete"&&!S.dlg){act("del")}
+ }});
+window.addEventListener("hashchange",function(){var h=location.hash.slice(1);if(SCR[h]&&h!==S.screen){S.dlg=null;S.toast=null;S.screen=h;sel.value=h;render()}});
+sel.addEventListener("change",function(){go(sel.value)});
+document.getElementById("pRole").addEventListener("change",function(){S.role=this.value;render()});
+document.getElementById("pState").addEventListener("change",function(){S.state=this.value;if(S.screen==="SCR-04"&&this.value==="normal"&&!S.cart.length)resetCart();render()});
+document.getElementById("pHost").addEventListener("click",function(){S.host=!S.host;this.setAttribute("aria-pressed",String(!S.host));render()});
+document.getElementById("pDensity").addEventListener("click",function(){var on=document.documentElement.getAttribute("data-density")==="compact";if(on)document.documentElement.removeAttribute("data-density");else document.documentElement.setAttribute("data-density","compact");this.setAttribute("aria-pressed",String(!on))});
+document.getElementById("pTheme").addEventListener("click",function(){var d=document.documentElement.getAttribute("data-theme")==="dark";document.documentElement.setAttribute("data-theme",d?"light":"dark");this.setAttribute("aria-pressed",String(!d))});
+var start=location.hash.slice(1);if(SCR[start])S.screen=start;sel.value=S.screen;render();
+})();
+</script>

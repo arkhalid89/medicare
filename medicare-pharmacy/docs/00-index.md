@@ -6,9 +6,9 @@ Track: non-monetized internal system (single pharmacy). Process: saas-product-ar
 | Phase | Output | Gate | Status |
 |---|---|---|---|
 | 0 Discovery | [brief](01-idea/brief.md) | G1 | approved 2026-10-14 |
-| 1 Research | [summary](01-idea/research/summary.md) | G2 | awaiting owner |
-| 2 Concept | `01-idea/concept.md`, `personas.md` | G3 | todo |
-| 3 Design | `02-design/` | G4, G5 | todo |
+| 1 Research | [summary](01-idea/research/summary.md) | G2 | approved 2026-10-14 |
+| 2 Concept | [concept](01-idea/concept.md), [personas](01-idea/personas.md) | G3 | approved 2026-10-14 |
+| 3 Design | [flows](02-design/flows.md), [design system](02-design/design-system.md), [prototype](02-design/prototype/index.html) | G4, G5 | G4 approved; G5 awaiting owner |
 | 4 Planning | `03-planning/` | G6 | todo |
 | 5 Handoff | `04-development/`, `05-production/`, `../CLAUDE.md` | G7 | todo |
 
@@ -24,3 +24,6 @@ Track: non-monetized internal system (single pharmacy). Process: saas-product-ar
 | 2026-10-14 | Name: MediCare Pharmacy | Owner | brief |
 | 2026-10-14 | Design: three directions to choose from at G4 | Owner | - |
 | 2026-10-14 | G1 brief approved incl. assumptions A1-A6 | Owner | brief |
+| 2026-10-14 | G2: emphasis on single truth, correct money, GS1 2D scan; Schedule B/D register at Should level | Owner | research/summary |
+| 2026-10-14 | G3: concept C3 "One Truth" and Standard on-prem architecture approved | Owner | concept, ADR-001 |
+| 2026-10-14 | G4: design direction A (Clear Dispensary) + C keycap strip + Compact density | Owner | design-system, ADR-010 |

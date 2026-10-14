@@ -1,0 +1,92 @@
+/* MediCare Pharmacy design tokens. Source of truth for colour, type, spacing, shape and motion.
+   Direction: A "Clear Dispensary" + C keycap strip and density (G4, 2026-10-14).
+   The WinForms theme (src/MediCare.Client/Theme/Tokens.cs) mirrors these values; a unit test parses this
+   file and fails if any token differs. Change a value here first, then in Tokens.cs. */
+
+:root {
+  /* ---- colour: neutrals (cool, biased toward the teal accent) ---- */
+  --c-canvas: #F5F8F8;        /* app background */
+  --c-surface: #FFFFFF;       /* panels, grids, inputs */
+  --c-surface-alt: #EDF2F2;   /* grid header, chips, keycaps */
+  --c-ink: #10262B;           /* primary text 14.7:1 on canvas */
+  --c-ink-muted: #4E6469;     /* secondary text 6.3:1 on surface */
+  --c-line: #D5E0E1;          /* 1px borders, row separators */
+  --c-line-strong: #A9BBBE;   /* input borders, keycap bottom */
+  --c-select: #E3F1F1;        /* selected row */
+
+  /* ---- colour: brand ---- */
+  --c-accent: #0B6E74;        /* dispensary teal; white text on it 6.0:1 */
+  --c-accent-hover: #095B60;
+  --c-on-accent: #FFFFFF;
+  --c-primary-action: #10262B;/* "Take payment", "Post" buttons (ink-filled) */
+  --c-on-primary: #FFFFFF;
+  --c-focus: #0B6E74;         /* 2px focus ring + 4px halo at 12% */
+
+  /* ---- colour: semantic (never used as decoration) ---- */
+  --c-ok: #1F7A3A;      --c-ok-bg: #E7F4EA;      /* 4.8:1 */
+  --c-warn: #8A5A00;    --c-warn-bg: #FFF3D6;    /* 5.4:1 near-expiry, pending */
+  --c-danger: #B42318;  --c-danger-bg: #FDECEA;  /* 5.8:1 expired, errors, blocked */
+  --c-info: #0B5C8A;    --c-info-bg: #E2F0F8;    /* 2D scan, information */
+
+  /* ---- type ---- */
+  --f-ui: "Atkinson Hyperlegible", "Segoe UI", Tahoma, sans-serif;
+  --f-num: "IBM Plex Mono", Consolas, "Courier New", monospace;     /* amounts, batches, doc numbers */
+  --f-urdu: "Noto Naskh Arabic", "Noto Nastaliq Urdu", serif;      /* receipts only */
+  --t-xs: 11px;  /* chips, column headers (uppercase, +0.06em) */
+  --t-sm: 12px;  /* secondary lines, status bar */
+  --t-md: 14px;  /* default UI text */
+  --t-lg: 15px;  /* medicine names in grids */
+  --t-xl: 18px;  /* screen titles */
+  --t-2xl: 24px; /* KPI values */
+  --t-total: 40px; /* POS net payable */
+  --w-regular: 400;
+  --w-bold: 700;
+
+  /* ---- spacing (4px scale) ---- */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 20px; --s-6: 24px; --s-8: 32px;
+
+  /* ---- shape, size, density ---- */
+  --r-sm: 4px;  /* chips, keycaps */
+  --r-md: 6px;  /* inputs, buttons, panels */
+  --border: 1px;
+  --focus-width: 2px;
+  --nav-width: 184px;
+  --nav-rail: 56px;
+  --header-h: 56px;
+  --status-h: 30px;
+  --fkey-h: 46px;
+  --control-h: 36px;   /* inputs and buttons; 44px for primary actions */
+  --control-h-lg: 44px;
+  --row-h: 40px;       /* comfortable density */
+  --elev-dialog: 0 12px 32px rgba(16, 38, 43, 0.18);
+
+  /* ---- motion (WinForms: only dialog fade and toast slide; off when Windows "Show animations" is off) ---- */
+  --m-fast: 120ms;
+  --m-base: 180ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Compact density: per-user setting */
+[data-density="compact"] {
+  --row-h: 32px;
+  --control-h: 30px;
+  --t-lg: 14px;
+}
+
+/* Dark theme (optional per user, for night shifts). Same structure, re-tuned contrast. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --c-canvas: #0F1719; --c-surface: #152023; --c-surface-alt: #1C2A2E; --c-ink: #E6EFF0; --c-ink-muted: #9EB2B6;
+    --c-line: #2A3A3E; --c-line-strong: #46595D; --c-select: #1B3538;
+    --c-accent: #4FB8C0; --c-accent-hover: #6CCAD1; --c-on-accent: #071214; --c-primary-action: #E6EFF0; --c-on-primary: #0F1719; --c-focus: #4FB8C0;
+    --c-ok: #6CCB8A; --c-ok-bg: #16301F; --c-warn: #E8B04A; --c-warn-bg: #352A12; --c-danger: #FF8A7E; --c-danger-bg: #3A1A17; --c-info: #7FC4FF; --c-info-bg: #14303F;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --c-canvas: #0F1719; --c-surface: #152023; --c-surface-alt: #1C2A2E; --c-ink: #E6EFF0; --c-ink-muted: #9EB2B6;
+  --c-line: #2A3A3E; --c-line-strong: #46595D; --c-select: #1B3538;
+  --c-accent: #4FB8C0; --c-accent-hover: #6CCAD1; --c-on-accent: #071214; --c-primary-action: #E6EFF0; --c-on-primary: #0F1719; --c-focus: #4FB8C0;
+  --c-ok: #6CCB8A; --c-ok-bg: #16301F; --c-warn: #E8B04A; --c-warn-bg: #352A12; --c-danger: #FF8A7E; --c-danger-bg: #3A1A17; --c-info: #7FC4FF; --c-info-bg: #14303F;
+  color-scheme: dark;
+}
