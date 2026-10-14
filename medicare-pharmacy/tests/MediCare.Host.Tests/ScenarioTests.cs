@@ -193,7 +193,11 @@ public class ScenarioTests
         var today = Clock.Today;
         await Receive(api, sup, risek, boxes: 1, rate: 1754m, batch: "LATE", expiry: today.AddDays(300));
         await Receive(api, sup, risek, boxes: 1, rate: 1754m, batch: "EARLY", expiry: today.AddDays(20));
+        var quote = await api.Post<SaleQuote>("/api/v1/sales/quote", CashSale(risek, "Box", 1, 2100m));
+        Assert.Equal(2100m, quote.Net);
+        Assert.StartsWith("EARLY", quote.Lines.Single().Batches);
         var sale = await api.Post<SaleResult>("/api/v1/sales", CashSale(risek, "Box", 1, 2100m));
+        Assert.Equal(quote.Net, sale.Net);
         var d = await api.Get<SaleDetail>($"/api/v1/sales/{sale.Id}");
         Assert.Equal("EARLY", d.Lines.Single().BatchNo);
         var sale2 = await api.Post<SaleResult>("/api/v1/sales", CashSale(risek, "Strip", 1, 420m));

@@ -96,6 +96,32 @@ namespace MediCare.Contracts
         public ReceiptDto Receipt { get; set; } = new ReceiptDto();
     }
 
+    /// <summary>Read-only pricing of a cart, computed by the host with the same code that posts the sale.</summary>
+    public sealed class SaleQuoteLine
+    {
+        public int LineIndex { get; set; }
+        public decimal Rate { get; set; }
+        public decimal Gross { get; set; }
+        public decimal Discount { get; set; }
+        public decimal Tax { get; set; }
+        public decimal Net { get; set; }
+        public string Batches { get; set; } = "";
+        public string Pick { get; set; } = "FEFO";
+        public DateTime? NearestExpiry { get; set; }
+        public string Schedule { get; set; } = "";
+    }
+
+    public sealed class SaleQuote
+    {
+        public decimal Gross { get; set; }
+        public decimal Discount { get; set; }
+        public decimal DiscountPercent { get; set; }
+        public decimal Taxable { get; set; }
+        public decimal Tax { get; set; }
+        public decimal Net { get; set; }
+        public List<SaleQuoteLine> Lines { get; set; } = new List<SaleQuoteLine>();
+    }
+
     public sealed class SaleSummary
     {
         public long Id { get; set; }

@@ -14,6 +14,7 @@ public static class SalesModule
     public static void Map(WebApplication app)
     {
         var g = app.MapGroup("/api/v1");
+        g.MapPost("/sales/quote", (SaleRequest r, SalesService s) => s.Quote(r)).Perm(Perm.SalesPos);
         g.MapPost("/sales", (HttpContext http, SaleRequest r, SalesService s) => s.Post(http.Ctx(), r, http.Tokens(r.ApprovalTokens.ToArray()))).Perm(Perm.SalesPos);
         g.MapGet("/sales", (HttpContext http, DateTime? from, DateTime? to, string? q, int? counter, long? customerId, SalesService s) => s.List(http.Ctx(), from, to, q, counter, customerId)).Authenticated();
         g.MapGet("/sales/{id:long}", (long id, HttpContext http, SalesService s) => s.Detail(http.Ctx(), id)).Authenticated();
@@ -45,6 +46,115 @@ public sealed class SalesService(Db db, SettingsService settings)
 
     public static long WalkInId(SqliteConnection c, SqliteTransaction? tx) => c.ExecuteScalar<long>("SELECT id FROM customers WHERE type='WALKIN' ORDER BY id LIMIT 1", transaction: tx);
 
+    /// <summary>Allocates batches (FEFO, or the scanned / picked batch) and prices the cart (FR-064).
+    /// Used by Post and by the read-only Quote the POS calls, so the screen always shows what will be posted.</summary>
+    private static (List<Sub> subs, PriceResult priced) PriceCart(SqliteConnection c, SqliteTransaction? tx, SaleRequest req, bool taxInclusive)
+    {
+        var today = Clock.Today;
+
+        // ---- allocate batches (FEFO, or the scanned / picked batch) ----
+        var subs = new List<Sub>();
+        var consumed = new Dictionary<long, int>();
+        for (int i = 0; i < req.Lines.Count; i++)
+        {
+            var line = req.Lines[i];
+            var med = CatalogueService.Row(c, tx, line.MedicineId);
+            if (med.IsActive == 0) throw new AppException(409, ErrorCodes.BatchNotSaleable, $"{med.Name} is inactive and cannot be sold.");
+            var pack = c.QuerySingleOrDefault<CatalogueService.PackRow>("SELECT * FROM medicine_packs WHERE id=@id", new { id = line.PackId }, tx);
+            if (pack == null || pack.MedicineId != med.Id || pack.IsSellable == 0 || pack.IsActive == 0)
+                throw AppException.Validation($"{med.Name}: the chosen pack cannot be sold.");
+            var baseQty = line.Qty * (int)pack.BaseQty;
+            var batches = CatalogueService.BatchesOf(c, tx, med.Id, includeEmpty: true);
+            if (line.BatchId.HasValue)
+            {
+                var forced = batches.FirstOrDefault(b => b.BatchId == line.BatchId.Value);
+                if (forced == null || !Fefo.IsSaleable(forced.Expiry, today) || forced.AvailableQty <= 0)
+                    throw new AppException(409, ErrorCodes.BatchNotSaleable, forced == null ? $"{med.Name}: the chosen batch does not belong to this medicine."
+                        : !Fefo.IsSaleable(forced.Expiry, today) ? $"Batch {forced.BatchNo} of {med.Name} expired on {Dates.Display(forced.Expiry)}. Expired stock cannot be sold."
+                        : $"Batch {forced.BatchNo} of {med.Name} has no saleable stock.");
+            }
+            var stock = batches.Select(b => new BatchStock { BatchId = b.BatchId, Expiry = b.Expiry, Available = b.AvailableQty - (consumed.TryGetValue(b.BatchId, out var u) ? u : 0) }).ToList();
+            var alloc = Fefo.Allocate(stock, baseQty, today, line.BatchId);
+            if (!alloc.Complete)
+            {
+                var available = baseQty - alloc.Shortfall;
+                throw new AppException(409, ErrorCodes.StockChanged, $"{med.Name}: only {CatalogueService.QtyText(available, CatalogueService.Packs(c, tx, med.Id), med.BaseUnit)} saleable in stock; {line.Qty} {pack.Name} requested.",
+                    new Dictionary<string, string> { ["lineIndex"] = i.ToString(CultureInfo.InvariantCulture), ["medicineId"] = med.Id.ToString(CultureInfo.InvariantCulture), ["available"] = available.ToString(CultureInfo.InvariantCulture) });
+            }
+            var defaultPack = med.DefaultSalePackId.HasValue ? c.QuerySingleOrDefault<CatalogueService.PackRow>("SELECT * FROM medicine_packs WHERE id=@id", new { id = med.DefaultSalePackId }, tx) : null;
+            var lineSubs = new List<Sub>();
+            foreach (var a in alloc.Allocations)
+            {
+                consumed[a.BatchId] = (consumed.TryGetValue(a.BatchId, out var u) ? u : 0) + a.Qty;
+                var batch = batches.First(b => b.BatchId == a.BatchId);
+                var rate = Money.FromPaisa(pack.SalePaisa);
+                if (batch.SalePrice.HasValue && batch.SalePrice.Value > 0 && defaultPack != null)
+                    rate = PricingCalculator.ScalePrice(batch.SalePrice.Value, (int)defaultPack.BaseQty, (int)pack.BaseQty);
+                lineSubs.Add(new Sub
+                {
+                    LineIndex = i, Med = med, Pack = pack, BatchId = a.BatchId, BaseQty = a.Qty, Rate = rate, Gross = PricingCalculator.LineGross(rate, a.Qty, (int)pack.BaseQty),
+                    Pick = line.BatchId.HasValue && a.BatchId == line.BatchId.Value ? (line.Pick == "2D" ? "2D" : "MANUAL") : "FEFO",
+                });
+            }
+            var lineGross = lineSubs.Sum(s => s.Gross);
+            if (line.DiscountAmount > lineGross) throw AppException.Validation($"{med.Name}: discount is more than the line amount.");
+            var shares = Costing.AllocatePro(line.DiscountAmount, lineSubs.Select(s => s.Gross).ToList());
+            for (int k = 0; k < lineSubs.Count; k++) lineSubs[k].Discount = shares[k];
+            subs.AddRange(lineSubs);
+        }
+
+        // ---- price (FR-064) ----
+        var priced = PricingCalculator.Calculate(subs.Select(s => new PriceLine { UnitPrice = s.Gross, Qty = 1, LineDiscount = s.Discount, TaxRatePercent = Money.BpToPercent(s.Med.TaxBp) }).ToList(), req.InvoiceDiscount, taxInclusive);
+        for (int k = 0; k < subs.Count; k++) subs[k].Priced = priced.Lines[k];
+        return (subs, priced);
+    }
+
+    public SaleQuote Quote(SaleRequest req)
+    {
+        if (req.Lines.Any(l => l.Qty <= 0)) throw AppException.Validation("Quantities must be more than zero.");
+        if (req.Lines.Any(l => l.DiscountAmount < 0) || req.InvoiceDiscount < 0) throw AppException.Validation("Discounts cannot be negative.");
+        var taxInclusive = settings.GetBool("tax.inclusive");
+        return db.Read(c =>
+        {
+            var q = new SaleQuote();
+            if (req.Lines.Count == 0) return q;
+            var (subs, priced) = PriceCart(c, null, req, taxInclusive);
+            q.Gross = priced.Gross; q.Discount = priced.Discount; q.Taxable = priced.Taxable; q.Tax = priced.Tax; q.Net = priced.Net;
+            q.DiscountPercent = priced.Gross == 0 ? 0 : Math.Ceiling(priced.Discount / priced.Gross * 10000m) / 100m;
+            var batchNos = new Dictionary<long, (string no, DateTime exp)>();
+            for (int i = 0; i < req.Lines.Count; i++)
+            {
+                var ls = subs.Where(x => x.LineIndex == i).ToList();
+                var parts = new List<string>();
+                foreach (var x in ls)
+                {
+                    if (!batchNos.TryGetValue(x.BatchId, out var b))
+                    {
+                        var r = c.QuerySingle<(string batch_no, string expiry)>("SELECT batch_no, expiry_date FROM batches WHERE id=@id", new { id = x.BatchId });
+                        b = (r.batch_no, DateTime.Parse(r.expiry, CultureInfo.InvariantCulture));
+                        batchNos[x.BatchId] = b;
+                    }
+                    parts.Add($"{b.no} ({Dates.Expiry(b.exp)}){(ls.Count > 1 ? " ×" + x.BaseQty : "")}");
+                }
+                var first = ls.FirstOrDefault();
+                q.Lines.Add(new SaleQuoteLine
+                {
+                    LineIndex = i,
+                    Rate = first?.Rate ?? 0,
+                    Gross = ls.Sum(x => x.Priced.Gross),
+                    Discount = ls.Sum(x => x.Priced.TotalDiscount),
+                    Tax = ls.Sum(x => x.Priced.Tax),
+                    Net = ls.Sum(x => x.Priced.Net),
+                    Batches = string.Join(", ", parts),
+                    Pick = first?.Pick ?? "FEFO",
+                    NearestExpiry = ls.Count == 0 ? (DateTime?)null : ls.Min(x => batchNos[x.BatchId].exp),
+                    Schedule = first?.Med.Schedule ?? "",
+                });
+            }
+            return q;
+        });
+    }
+
     public SaleResult Post(Ctx ctx, SaleRequest req, List<string?> tokens)
     {
         if (req.Lines.Count == 0) throw AppException.Validation("Add at least one medicine before taking payment.");
@@ -67,62 +177,7 @@ public sealed class SalesService(Db db, SettingsService settings)
             var customer = c.QueryOne<(string name, string type, long limit, long active)>("SELECT name, type, credit_limit_paisa, is_active FROM customers WHERE id=@customerId", new { customerId }, tx)
                            ?? throw AppException.NotFound("Customer");
             if (customer.active == 0) throw AppException.Validation($"Customer {customer.name} is inactive.");
-            var today = Clock.Today;
-
-            // ---- allocate batches (FEFO, or the scanned / picked batch) ----
-            var subs = new List<Sub>();
-            var consumed = new Dictionary<long, int>();
-            for (int i = 0; i < req.Lines.Count; i++)
-            {
-                var line = req.Lines[i];
-                var med = CatalogueService.Row(c, tx, line.MedicineId);
-                if (med.IsActive == 0) throw new AppException(409, ErrorCodes.BatchNotSaleable, $"{med.Name} is inactive and cannot be sold.");
-                var pack = c.QuerySingleOrDefault<CatalogueService.PackRow>("SELECT * FROM medicine_packs WHERE id=@id", new { id = line.PackId }, tx);
-                if (pack == null || pack.MedicineId != med.Id || pack.IsSellable == 0 || pack.IsActive == 0)
-                    throw AppException.Validation($"{med.Name}: the chosen pack cannot be sold.");
-                var baseQty = line.Qty * (int)pack.BaseQty;
-                var batches = CatalogueService.BatchesOf(c, tx, med.Id, includeEmpty: true);
-                if (line.BatchId.HasValue)
-                {
-                    var forced = batches.FirstOrDefault(b => b.BatchId == line.BatchId.Value);
-                    if (forced == null || !Fefo.IsSaleable(forced.Expiry, today) || forced.AvailableQty <= 0)
-                        throw new AppException(409, ErrorCodes.BatchNotSaleable, forced == null ? $"{med.Name}: the chosen batch does not belong to this medicine."
-                            : !Fefo.IsSaleable(forced.Expiry, today) ? $"Batch {forced.BatchNo} of {med.Name} expired on {Dates.Display(forced.Expiry)}. Expired stock cannot be sold."
-                            : $"Batch {forced.BatchNo} of {med.Name} has no saleable stock.");
-                }
-                var stock = batches.Select(b => new BatchStock { BatchId = b.BatchId, Expiry = b.Expiry, Available = b.AvailableQty - (consumed.TryGetValue(b.BatchId, out var u) ? u : 0) }).ToList();
-                var alloc = Fefo.Allocate(stock, baseQty, today, line.BatchId);
-                if (!alloc.Complete)
-                {
-                    var available = baseQty - alloc.Shortfall;
-                    throw new AppException(409, ErrorCodes.StockChanged, $"{med.Name}: only {CatalogueService.QtyText(available, CatalogueService.Packs(c, tx, med.Id), med.BaseUnit)} saleable in stock; {line.Qty} {pack.Name} requested.",
-                        new Dictionary<string, string> { ["lineIndex"] = i.ToString(CultureInfo.InvariantCulture), ["medicineId"] = med.Id.ToString(CultureInfo.InvariantCulture), ["available"] = available.ToString(CultureInfo.InvariantCulture) });
-                }
-                var defaultPack = med.DefaultSalePackId.HasValue ? c.QuerySingleOrDefault<CatalogueService.PackRow>("SELECT * FROM medicine_packs WHERE id=@id", new { id = med.DefaultSalePackId }, tx) : null;
-                var lineSubs = new List<Sub>();
-                foreach (var a in alloc.Allocations)
-                {
-                    consumed[a.BatchId] = (consumed.TryGetValue(a.BatchId, out var u) ? u : 0) + a.Qty;
-                    var batch = batches.First(b => b.BatchId == a.BatchId);
-                    var rate = Money.FromPaisa(pack.SalePaisa);
-                    if (batch.SalePrice.HasValue && batch.SalePrice.Value > 0 && defaultPack != null)
-                        rate = PricingCalculator.ScalePrice(batch.SalePrice.Value, (int)defaultPack.BaseQty, (int)pack.BaseQty);
-                    lineSubs.Add(new Sub
-                    {
-                        LineIndex = i, Med = med, Pack = pack, BatchId = a.BatchId, BaseQty = a.Qty, Rate = rate, Gross = PricingCalculator.LineGross(rate, a.Qty, (int)pack.BaseQty),
-                        Pick = line.BatchId.HasValue && a.BatchId == line.BatchId.Value ? (line.Pick == "2D" ? "2D" : "MANUAL") : "FEFO",
-                    });
-                }
-                var lineGross = lineSubs.Sum(s => s.Gross);
-                if (line.DiscountAmount > lineGross) throw AppException.Validation($"{med.Name}: discount is more than the line amount.");
-                var shares = Costing.AllocatePro(line.DiscountAmount, lineSubs.Select(s => s.Gross).ToList());
-                for (int k = 0; k < lineSubs.Count; k++) lineSubs[k].Discount = shares[k];
-                subs.AddRange(lineSubs);
-            }
-
-            // ---- price (FR-064) ----
-            var priced = PricingCalculator.Calculate(subs.Select(s => new PriceLine { UnitPrice = s.Gross, Qty = 1, LineDiscount = s.Discount, TaxRatePercent = Money.BpToPercent(s.Med.TaxBp) }).ToList(), req.InvoiceDiscount, taxInclusive);
-            for (int k = 0; k < subs.Count; k++) subs[k].Priced = priced.Lines[k];
+            var (subs, priced) = PriceCart(c, tx, req, taxInclusive);
             var net = Money.ToPaisa(priced.Net);
 
             // ---- approvals: discount, prescription ----

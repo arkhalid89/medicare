@@ -60,6 +60,7 @@ public sealed class TestHost : IDisposable
         _factory.Dispose();
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         Clock.UtcNowFn = () => DateTime.UtcNow;
+        if (Environment.GetEnvironmentVariable("MEDICARE_KEEP_TEST_DATA") == "1") return;
         try { Directory.Delete(DataDir, true); } catch { }
     }
 }

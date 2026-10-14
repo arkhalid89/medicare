@@ -1,0 +1,14 @@
+global using System;
+global using System.Collections.Generic;
+global using System.Drawing;
+global using System.Globalization;
+global using System.Linq;
+global using System.Threading.Tasks;
+global using System.Windows.Forms;
+global using MediCare.Client.Infrastructure;
+global using MediCare.Client.Ui;
+global using MediCare.Contracts;
+global using MediCare.Core;
+global using MediCare.Client.Dialogs;
+global using MediCare.Client.Shell;
+global using MediCare.Client.Printing;
