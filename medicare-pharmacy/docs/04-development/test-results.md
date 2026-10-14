@@ -137,6 +137,25 @@ Response size with gzip (GET only; POST responses stay uncompressed so session t
 
 Other changes: SQLite page cache 64 MB and 256 MB memory-mapped reads; release build publishes the host, host monitor and Windows 10/11 client ReadyToRun (precompiled) for faster start. All 44 tests pass after the changes.
 
+## Re-run after the optimisation pass and release build (2026-10-14)
+Same command and data size as the spec-rate run above, against the Release host over HTTPS. RESULT: PASS.
+
+| Operation | Count | p50 ms | p95 ms | p99 ms | max ms | Before (p95 / max) |
+|---|---|---|---|---|---|---|
+| lookup | 2257 | 1 | 7 | 9 | 46 | 10 / 90 |
+| quote | 1609 | 1 | 2 | 3 | 5 | 2 / 58 |
+| post sale | 284 | 5 | 17 | 22 | 30 | 16 / 592 |
+| post return | 16 | 5 | 46 | 46 | 46 | 55 / 55 |
+| report | 8 | 189 | 296 | 296 | 296 | 699 / 699 |
+| backup | 1 | 5254 | 5254 | 5254 | 5254 | 6193 / 6193 |
+
+- History preload: 30,000 invoices in 1.9 min (264 invoices/s; before 230/s).
+- Duplicate invoice numbers 0, server errors 0, client failures 0; sales during the backup: 3, slowest 6 ms; self-check all green.
+- Unit and end-to-end tests: 44 / 44 pass in Release.
+
+## Release build and installers (2026-10-14)
+Built on Linux with `build.sh` (.NET 10 publish; Inno Setup 6.5.4 under Wine): `MediCarePharmacy-Host-Setup-1.0.0.exe` (71 MB), `MediCarePharmacy-Client-win10-Setup-1.0.0.exe` (36 MB), `MediCarePharmacy-Client-win7-Setup-1.0.0.exe` (2.7 MB). All three compile with no warnings; published executables carry version 1.0.0.0 and the app icon. The Windows 10/11 client installer was installed silently under Wine: 236 program files, the 8 fonts and 3 licence files in place (Wine cannot set the ACL on the shared data folder; Windows can). Fixed during the build: the Windows 7 installer did not compile (a [Files]-only flag on [Registry] entries), and the regular font weights now register under their full names. Not yet done: install on real Windows (service, firewall rule, pairing) and code signing.
+
 ## Still to do on the pharmacy's hardware (S25)
 - UI smoke checklist on Windows 7 SP1 and Windows 10/11 at 100 % and 150 % scaling, keyboard only.
 - Receipt printing on the actual 58/80 mm printers including the Urdu footer; cash drawer.
