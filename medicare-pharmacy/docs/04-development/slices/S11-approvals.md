@@ -1,5 +1,5 @@
 # S11 - Approvals
-Status: todo      Size: M      Depends on: S10
+Status: done      Size: M      Depends on: S10
 
 ## Goal
 Managers approve discounts, refunds, credit over limit, adjustments, reversals, cash differences and back-dated postings with a PIN on the requesting PC or from the inbox.
@@ -31,3 +31,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host ApprovalService in `Domain/Services.cs`; client `Dialogs/ApprovalDialog.cs` (inline PIN or send to screen), ApprovalsScreen.

@@ -1,5 +1,5 @@
 # S10 - Payment posting printing
-Status: todo      Size: L      Depends on: S09
+Status: done      Size: L      Depends on: S09
 
 ## Goal
 The cashier takes cash, card, wallet, split or credit payment; the sale posts exactly once with stock, COGS, journal and cashbook; the receipt prints with Urdu lines; host-down keeps a draft that posts once after reconnect.
@@ -33,3 +33,6 @@ Returns (S14)
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host SalesService.Post; client PaymentDialog, `Printing/Printers.cs` (58/80 mm receipt, Urdu footer, cash drawer). Unconfirmed-sale draft resend in PosScreen.

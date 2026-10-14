@@ -1,5 +1,5 @@
 # S17 - Adjustments counts writeoff
-Status: todo      Size: M      Depends on: S08, S11
+Status: done      Size: M      Depends on: S08, S11
 
 ## Goal
 Stock operators adjust batches, run counts and write off quarantine stock, with approvals over thresholds and matching journal entries.
@@ -30,3 +30,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host StockService adjust, quarantine, counts; client AdjustDialog, QuarantineDialog, StockCountsScreen, CountDialog.

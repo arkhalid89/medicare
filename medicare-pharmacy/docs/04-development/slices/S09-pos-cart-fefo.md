@@ -1,5 +1,5 @@
 # S09 - Pos cart fefo
-Status: todo      Size: L      Depends on: S08
+Status: done      Size: L      Depends on: S08
 
 ## Goal
 The cashier builds a cart by scan or search with FEFO (or exact 2D batch), sees batch details, and the preview totals match the host's calculation exactly.
@@ -31,3 +31,6 @@ Payment and posting (S10)
 
 ## Notes
 The client never decides the final price; the host recalculates at posting.
+
+## Implementation
+Host `POST /sales/quote` + PriceCart in `Modules/SalesModule.cs`; client `Screens/PosScreen.cs`, `Dialogs/SalesDialogs.cs` (BatchPickDialog, LineDialog, DiscountDialog).

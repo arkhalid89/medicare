@@ -1,5 +1,5 @@
 # S15 - Purchase returns reversals
-Status: todo      Size: M      Depends on: S07, S11
+Status: done      Size: M      Depends on: S07, S11
 
 ## Goal
 Managers return batches to suppliers and reverse posted sales or purchases with approval, never editing originals.
@@ -30,3 +30,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host PurchaseService.Return / Reverse; client PurchaseReturnDialog, reversal actions.

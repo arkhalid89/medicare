@@ -1,5 +1,5 @@
 # S02 - Auth users permissions
-Status: todo      Size: M      Depends on: S01
+Status: done      Size: M      Depends on: S01
 
 ## Goal
 Staff log in, lock and unlock, and see only what their role allows; the host enforces every permission; the first admin is created by the setup wizard.
@@ -34,3 +34,6 @@ Approvals (S11)
 
 ## Notes
 Never log the request body of auth endpoints.
+
+## Implementation
+Host `Security/Auth.cs`, `Modules/SetupAuthModule.cs`, `Modules/AdminModule.cs`; client `Shell/LoginForms.cs`, `Screens/AdminScreens.cs` (UsersScreen, RoleDialog).

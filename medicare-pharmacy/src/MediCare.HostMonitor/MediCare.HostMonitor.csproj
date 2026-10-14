@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Host monitor (SCR-33, FR-109): tray app on the host PC. Reads host-status.json written by
+       MediCare.Host and controls the Windows service. Deliberately has no project references so it
+       keeps working (and can be shipped) independently of the host build. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MediCare.HostMonitor</RootNamespace>
+    <AssemblyName>MediCare.HostMonitor</AssemblyName>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ApplicationVisualStyles>true</ApplicationVisualStyles>
+    <ApplicationDefaultFont>Segoe UI, 9pt</ApplicationDefaultFont>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.13" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Assets\app.ico" />
+  </ItemGroup>
+</Project>

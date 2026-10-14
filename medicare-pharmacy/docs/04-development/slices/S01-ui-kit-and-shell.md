@@ -1,5 +1,5 @@
 # S01 - Ui kit and shell
-Status: todo      Size: M      Depends on: S00
+Status: done      Size: M      Depends on: S00
 
 ## Goal
 The client shell (nav, header, status bar, F-key strip host) and the token-driven component kit look like the prototype on both runtimes.
@@ -32,3 +32,6 @@ Business logic, API calls
 
 ## Notes
 Match prototype layout in docs/02-design/prototype/index.html; tokens only, no raw colours.
+
+## Implementation
+`src/MediCare.Client/Ui/*` (Theme from tokens.css, Grid, controls, dialogs), `Shell/MainForm.cs`, `Shell/NavPanel.cs`, keycap strip in `Ui/Controls.cs`.

@@ -1,5 +1,5 @@
 # S04 - Medicine master
-Status: todo      Size: M      Depends on: S03
+Status: done      Size: M      Depends on: S03
 
 ## Goal
 Managers maintain medicines with barcodes, pack levels, prices, flags and Urdu names; everyone can search fast.
@@ -32,3 +32,6 @@ Import (S05), stock views (S08)
 
 ## Notes
 Unit conversion lives in Core so the client preview uses the same code.
+
+## Implementation
+Host `Modules/CatalogueModule.cs` (CatalogueService); client `Screens/InventoryScreens.cs` (MedicinesScreen), `Dialogs/MedicineEditor.cs`.

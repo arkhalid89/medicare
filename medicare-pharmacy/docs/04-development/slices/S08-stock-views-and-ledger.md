@@ -1,5 +1,5 @@
 # S08 - Stock views and ledger
-Status: todo      Size: M      Depends on: S07
+Status: done      Size: M      Depends on: S07
 
 ## Goal
 Managers see batches by state, near-expiry and low-stock lists; every balance is explained by its movements; negative stock is impossible.
@@ -31,3 +31,6 @@ Adjustments (S18)
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host `Modules/StockModule.cs`; client BatchesScreen in `Screens/InventoryScreens.cs`.

@@ -1,5 +1,5 @@
 # S12 - Holds history prescriptions
-Status: todo      Size: M      Depends on: S10
+Status: done      Size: M      Depends on: S10
 
 ## Goal
 Cashiers hold and recall sales, search and reprint invoices, and capture prescriptions for Rx and scheduled medicines.
@@ -31,3 +31,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Holds and prescriptions in SalesModule; client HoldsDialog, PrescriptionDialog, InvoicesScreen.

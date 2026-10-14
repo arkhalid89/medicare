@@ -1,5 +1,5 @@
 # S03 - Posting core journal audit
-Status: todo      Size: L      Depends on: S02
+Status: done      Size: L      Depends on: S02
 
 ## Goal
 A generic, idempotent posting pipeline writes documents, journal entries and audit rows atomically through a single write queue, proven with a test document type.
@@ -34,3 +34,6 @@ Business documents (later slices)
 
 ## Notes
 Keep each write transaction < 50 ms; no network or printing inside a transaction.
+
+## Implementation
+Host `Domain/Foundation.cs` (journal, audit hash chain, doc numbers, idempotency, stock ledger), `Infrastructure/Core.cs` (write gate).

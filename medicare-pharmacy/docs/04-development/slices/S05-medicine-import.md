@@ -1,5 +1,5 @@
 # S05 - Medicine import
-Status: todo      Size: M      Depends on: S04
+Status: done      Size: M      Depends on: S04
 
 ## Goal
 The admin imports the existing medicine list from Excel or CSV with mapping, validation, dry run and one-transaction commit.
@@ -32,3 +32,6 @@ Opening stock import (not in scope; stock via goods-in)
 
 ## Notes
 Owner to supply a real sample file (launch checklist).
+
+## Implementation
+Host ImportService in `Modules/CatalogueModule.cs`; client ImportDialog in `Dialogs/MedicineEditor.cs`. Test: Import_Medicines_Csv_Validate_Commit_Undo.

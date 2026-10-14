@@ -1,5 +1,5 @@
 # S19 - Shift and day closing
-Status: todo      Size: M      Depends on: S18, S11
+Status: done      Size: M      Depends on: S18, S11
 
 ## Goal
 Cashiers open and close shifts with denomination counts; managers approve differences and close the day, locking its date.
@@ -29,3 +29,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host shifts and day close in AccountModule; client ClosingScreen, CloseShiftDialog, OpenShiftDialog.

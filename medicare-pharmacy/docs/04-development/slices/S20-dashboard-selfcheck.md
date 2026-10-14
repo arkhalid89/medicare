@@ -1,5 +1,5 @@
 # S20 - Dashboard selfcheck
-Status: todo      Size: M      Depends on: S10, S18
+Status: done      Size: M      Depends on: S10, S18
 
 ## Goal
 The dashboard shows role-filtered KPIs, charts and alerts from posted data; the nightly self-check proves stock, books and backups are consistent.
@@ -30,3 +30,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host ReportService.Dashboard, SelfCheckService; client `Screens/DashboardScreen.cs`, HostScreen.

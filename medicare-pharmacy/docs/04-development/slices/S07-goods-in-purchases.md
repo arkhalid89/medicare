@@ -1,5 +1,5 @@
 # S07 - Goods in purchases
-Status: todo      Size: L      Depends on: S04, S06
+Status: done      Size: L      Depends on: S04, S06
 
 ## Goal
 The stock operator enters supplier bills by 2D scan, 1D scan or search, posts them, and stock, average cost, payable and any immediate payment are written atomically.
@@ -32,3 +32,6 @@ Purchase returns and reversal (S15)
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host `Modules/PurchaseModule.cs`; client `Screens/PurchaseScreens.cs` (goods-in with 1D/2D capture).

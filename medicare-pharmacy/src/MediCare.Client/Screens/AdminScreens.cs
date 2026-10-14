@@ -544,7 +544,7 @@ public sealed class SettingsScreen : AppScreen
                     case "multiline":
                         var m = new UiText().Multi(3);
                         m.Text = s.Value.Replace("\n", Environment.NewLine);
-                        if (s.Key.Contains("Urdu", StringComparison.OrdinalIgnoreCase) || s.Key.Contains("urdu")) { m.RightToLeft = RightToLeft.Yes; m.Font = Theme.Urdu(16); }
+                        if (s.Key.IndexOf("urdu", StringComparison.OrdinalIgnoreCase) >= 0) { m.RightToLeft = RightToLeft.Yes; m.Font = Theme.Urdu(16); }
                         _values[s.Key] = () => m.Text.Replace("\r\n", "\n");
                         input = m;
                         break;
@@ -561,6 +561,7 @@ public sealed class SettingsScreen : AppScreen
                         break;
                     default:
                         var t = new UiText { Text = s.Value };
+                        if (s.Key.IndexOf("urdu", StringComparison.OrdinalIgnoreCase) >= 0 && s.Key.StartsWith("receipt.footer", StringComparison.Ordinal)) { t.RightToLeft = RightToLeft.Yes; t.Font = Theme.Urdu(16); }
                         _values[s.Key] = () => t.Text.Trim();
                         input = t;
                         break;
@@ -706,7 +707,7 @@ public sealed class HostScreen : AppScreen
         _check.Col("Result", 80);
         _check.Col("Detail", 0, ColKind.Text, 260);
         _check.RowTone = o => o is SelfCheckItem i && !i.Ok ? Tone.Danger : Tone.None;
-        var checkCard = new Card("Self-check (ledger = stock, cash = book, audit chain)") { Dock = DockStyle.Bottom, Height = Theme.S(240), Padding = new Padding(1, Theme.S(36), 1, 1) };
+        var checkCard = new Card("Self-check (stock, journals, invoices, audit chain, backup)") { Dock = DockStyle.Bottom, Height = Theme.S(240), Padding = new Padding(1, Theme.S(36), 1, 1) };
         checkCard.Controls.Add(_check);
         var run = new UiButton("Run self-check now", ButtonKind.Secondary, "F6");
         run.Click += (_, _) => Fire(RunCheck);

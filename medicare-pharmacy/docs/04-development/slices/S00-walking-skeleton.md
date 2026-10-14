@@ -1,5 +1,5 @@
 # S00 - Walking skeleton
-Status: todo      Size: M      Depends on: -
+Status: done      Size: M      Depends on: -
 
 ## Goal
 Solution builds for host (.NET 10) and client (net48 + net10.0-windows); the client pairs with the host over TLS with a pinned fingerprint and shows a live connection status.
@@ -35,3 +35,6 @@ Business screens, auth (S02)
 
 ## Notes
 Use `#if NET48` only in bootstrap files; record each in conventions.md. Do not use gRPC (ADR-003).
+
+## Implementation
+Solution `MediCarePharmacy.sln`; host `src/MediCare.Host/Program.cs`; client `src/MediCare.Client/Program.cs`; migrations `Sql/0001_init.sql`.

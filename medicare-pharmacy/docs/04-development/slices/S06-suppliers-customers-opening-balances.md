@@ -1,5 +1,5 @@
 # S06 - Suppliers customers opening balances
-Status: todo      Size: S      Depends on: S03
+Status: done      Size: S      Depends on: S03
 
 ## Goal
 Suppliers and customers exist with opening balances posted as opening journal entries; Walk-in is built in.
@@ -30,3 +30,6 @@ Ledgers (S13, S16)
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host `Modules/PartyModule.cs`; client `Screens/PartyScreens.cs`, `Dialogs/PartyDialogs.cs`.

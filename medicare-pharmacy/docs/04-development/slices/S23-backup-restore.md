@@ -1,5 +1,5 @@
 # S23 - Backup restore
-Status: todo      Size: L      Depends on: S03, S22
+Status: done      Size: L      Depends on: S03, S22
 
 ## Goal
 Automatic hourly and daily backups, USB backup and verified restore work without stopping sales, and a restore drill meets the RTO.
@@ -31,3 +31,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host `Modules/BackupModule.cs`; client BackupScreen (USB copy with SHA-256 verification), RestoreDialog. Test: Backup_And_Restore_RoundTrip.

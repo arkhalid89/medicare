@@ -1,5 +1,5 @@
 # S26 - Launch pack
-Status: todo      Size: M      Depends on: S25
+Status: done      Size: M      Depends on: S25
 
 ## Goal
 Everything needed to hand over and go live exists: demo DB, manuals, recovery docs, test results, release build.
@@ -30,3 +30,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+`docs/05-production/*`, `README.md`, `CLAUDE.md`. Owner inputs listed in the launch checklist.

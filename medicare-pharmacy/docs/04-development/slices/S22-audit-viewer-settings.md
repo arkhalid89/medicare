@@ -1,5 +1,5 @@
 # S22 - Audit viewer settings
-Status: todo      Size: M      Depends on: S03
+Status: done      Size: M      Depends on: S03
 
 ## Goal
 Admins search the audit log and manage all settings; settings changes reach counters within 30 s.
@@ -29,3 +29,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host audit endpoint and SettingsService; client AuditScreen, SettingsScreen (settings, lists, cash accounts).

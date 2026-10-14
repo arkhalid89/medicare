@@ -1,5 +1,5 @@
 # S14 - Sales returns
-Status: todo      Size: M      Depends on: S10, S11
+Status: done      Size: M      Depends on: S10, S11
 
 ## Goal
 Returns reference the original invoice, respect returnable quantities, route goods to restock or quarantine, reverse COGS and refund correctly.
@@ -30,3 +30,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host ReturnService; client SalesReturnDialog.

@@ -1,5 +1,5 @@
 # S24 - Installer host monitor
-Status: todo      Size: L      Depends on: S23
+Status: done      Size: L      Depends on: S23
 
 ## Goal
 One-click host and client installers set up the service, firewall, TLS, fonts and runtime; upgrades keep data; the host monitor shows service health.
@@ -31,3 +31,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+`installer/` (Inno Setup scripts, firewall and TLS scripts), `src/MediCare.HostMonitor/`, `build.ps1`.

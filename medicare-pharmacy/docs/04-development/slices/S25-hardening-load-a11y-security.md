@@ -1,5 +1,5 @@
 # S25 - Hardening load a11y security
-Status: todo      Size: L      Depends on: S24
+Status: partial      Size: L      Depends on: S24
 
 ## Goal
 The full system passes the 10-counter load test, accessibility and DPI checks, and a security review before UAT.
@@ -31,3 +31,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Done: concurrency and idempotency test (10 parallel posts), lockout and PIN counters, permission checks, TLS pinning. Still to run on Windows hardware: the 1,000-bill load test, keyboard and contrast pass of the WinForms screens, restore drill. See docs/05-production/launch-checklist.md.

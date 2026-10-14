@@ -576,7 +576,7 @@ public sealed class SelfCheckService(Db db)
         {
             var r = new SelfCheckResult { At = Clock.NowPkt };
             void Add(string check, bool ok, string detail) => r.Items.Add(new SelfCheckItem { Check = check, Ok = ok, Detail = detail });
-            var quick = c.ExecuteScalar<string>("PRAGMA quick_check");
+            var quick = c.ExecuteScalar<string>("PRAGMA quick_check") ?? "no result";
             Add("Database file integrity", quick == "ok", quick);
             var badStock = c.Query<(long batch_id, string state, long qty, long sum)>(@"SELECT x.batch_id, x.state, IFNULL(sb.qty,0), x.s FROM
                 (SELECT batch_id, state, SUM(qty_delta) AS s FROM stock_movements GROUP BY batch_id, state) x

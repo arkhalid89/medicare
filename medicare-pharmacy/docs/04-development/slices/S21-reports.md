@@ -1,5 +1,5 @@
 # S21 - Reports
-Status: todo      Size: L      Depends on: S20
+Status: done      Size: L      Depends on: S20
 
 ## Goal
 All 25 BRD reports and the controlled register run with filters, print and export, posted data only, within time targets.
@@ -31,3 +31,6 @@ Anything not listed above.
 
 ## Notes
 Split into S21a (sales/profit/stock) and S21b (accounts/admin/register) if it runs long.
+
+## Implementation
+Host `Modules/ReportModule.cs` (26 reports, CSV/XLSX); client `Screens/ReportsScreen.cs`, `Printing/TablePrinter.cs`.

@@ -1,5 +1,5 @@
 # S13 - Customer ledger receipts
-Status: todo      Size: M      Depends on: S10
+Status: done      Size: M      Depends on: S10
 
 ## Goal
 Accountants and cashiers see customer ledgers and collect receipts with allocation.
@@ -29,3 +29,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host PartyService ledger and receipts; client CustomersScreen, SettlementDialog, LedgerDialog.

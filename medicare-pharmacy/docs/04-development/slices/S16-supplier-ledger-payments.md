@@ -1,5 +1,5 @@
 # S16 - Supplier ledger payments
-Status: todo      Size: M      Depends on: S07
+Status: done      Size: M      Depends on: S07
 
 ## Goal
 Accountants see supplier statements and pay suppliers with allocation and optional balance enforcement.
@@ -30,3 +30,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host PartyService supplier ledger, payments, refunds; client SuppliersScreen, SettlementDialog, SupplierRefundDialog.

@@ -9,8 +9,8 @@ Track: non-monetized internal system (single pharmacy). Process: saas-product-ar
 | 1 Research | [summary](01-idea/research/summary.md) | G2 | approved 2026-10-14 |
 | 2 Concept | [concept](01-idea/concept.md), [personas](01-idea/personas.md) | G3 | approved 2026-10-14 |
 | 3 Design | [flows](02-design/flows.md), [design system](02-design/design-system.md), [prototype](02-design/prototype/index.html) | G4, G5 | approved 2026-10-14 |
-| 4 Planning | [PRD](03-planning/prd.md), [architecture](03-planning/architecture.md), [data model](03-planning/data-model.md), [ADRs](03-planning/adr/), [plan](03-planning/project-plan.md) | G6 | awaiting owner |
-| 5 Handoff | `04-development/`, `05-production/`, `../CLAUDE.md` | G7 | todo |
+| 4 Planning | [PRD](03-planning/prd.md), [architecture](03-planning/architecture.md), [data model](03-planning/data-model.md), [ADRs](03-planning/adr/), [plan](03-planning/project-plan.md) | G6 | approved 2026-10-14 |
+| 5 Handoff | [runbook](04-development/runbook.md), [conventions](04-development/conventions.md), [testing](04-development/testing.md), [deployment](05-production/deployment.md), [launch checklist](05-production/launch-checklist.md), [rollout](05-production/adoption-and-rollout.md), [compliance](05-production/compliance.md), [user manual](05-production/user-manual.md), [CLAUDE.md](../CLAUDE.md) | G7 | built; awaiting owner review |
 
 ## Decision log
 | Date | Decision | By | Where |
@@ -28,3 +28,6 @@ Track: non-monetized internal system (single pharmacy). Process: saas-product-ar
 | 2026-10-14 | G3: concept C3 "One Truth" and Standard on-prem architecture approved | Owner | concept, ADR-001 |
 | 2026-10-14 | G4: design direction A (Clear Dispensary) + C keycap strip + Compact density | Owner | design-system, ADR-010 |
 | 2026-10-14 | G5: flows, design system and prototype approved | Owner | 02-design |
+| 2026-10-14 | G6: planning pack approved as is | Owner | 03-planning |
+| 2026-10-14 | Build the complete application now (host, both clients, installers, docs) | Owner | runbook |
+| 2026-10-14 | Added `POST /sales/quote` so the POS shows host-computed prices (same code as posting) | Build | SalesModule, S09 |

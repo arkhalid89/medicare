@@ -1,5 +1,5 @@
 # S18 - Cashbook bankbook expenses
-Status: todo      Size: M      Depends on: S10
+Status: done      Size: M      Depends on: S10
 
 ## Goal
 Accountants see running cash and bank balances, record cash in/out and transfers, and post expense vouchers without double counting.
@@ -29,3 +29,6 @@ Anything not listed above.
 
 ## Notes
 Read CLAUDE.md working rules. Use error codes and copy from flows.md.
+
+## Implementation
+Host `Modules/AccountModule.cs`; client `Screens/AccountScreens.cs` (CashScreen, ExpensesScreen).

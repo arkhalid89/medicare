@@ -324,8 +324,8 @@ public sealed class JobsService(Db db, SettingsService settings, BackupService b
                         c.Execute("DELETE FROM idempotency_keys WHERE created_at < @t", new { t = Clock.Iso(Clock.UtcNow.AddDays(-30)) }, tx);
                         c.Execute("UPDATE approvals SET status='EXPIRED' WHERE status='APPROVED' AND expires_at < @t", new { t = Clock.NowIso() }, tx);
                     });
-                    WriteStatus();
                 }
+                WriteStatus();
             }
             catch (Exception ex)
             {
@@ -335,18 +335,26 @@ public sealed class JobsService(Db db, SettingsService settings, BackupService b
         }
     }
 
+    /// <summary>Writes host-status.json for the Host Monitor, also during maintenance (then with what is known without the database).</summary>
     private void WriteStatus()
     {
+        var path = Path.Combine(db.DataDir, "host-status.json");
+        if (db.Maintenance)
+        {
+            var minimal = new { Maintenance = true, MachineName = Environment.MachineName, CertificateFingerprint = cert.Fingerprint, Port = options.Port, Https = options.UseHttps, StartedAtUtc = System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime(), UpdatedUtc = Clock.UtcNow };
+            File.WriteAllText(path + ".tmp", Json.Serialize(minimal));
+            File.Move(path + ".tmp", path, overwrite: true);
+            return;
+        }
         var status = AdminModule.Status(db, auth, cert);
         var last = db.Read(c => c.QueryOne<(string started_at, string result, string kind)>("SELECT started_at, result, kind FROM backup_history ORDER BY id DESC LIMIT 1"));
         var payload = new
         {
             status.ServerVersion, status.SchemaVersion, status.MachineName, status.DbPath, status.DbSizeBytes, status.CertificateFingerprint, status.ActiveSessions,
-            Port = options.Port, Https = options.UseHttps, UpdatedUtc = Clock.UtcNow,
+            status.Maintenance, status.StartedAtUtc, Port = options.Port, Https = options.UseHttps, UpdatedUtc = Clock.UtcNow,
             LastBackup = last == null ? null : new { At = Clock.ToPkt(last.Value.started_at), last.Value.result, last.Value.kind },
             Workstations = status.Workstations.Select(w => new { w.Name, w.Os, w.ClientVersion, w.LastSeenAt, w.LastUser, w.IsActive }),
         };
-        var path = Path.Combine(db.DataDir, "host-status.json");
         File.WriteAllText(path + ".tmp", Json.Serialize(payload));
         File.Move(path + ".tmp", path, overwrite: true);
     }

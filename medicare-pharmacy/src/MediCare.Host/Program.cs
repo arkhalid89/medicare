@@ -7,7 +7,7 @@ using Serilog;
 DapperSetup.Configure();
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
-builder.Host.UseWindowsService(o => o.ServiceName = "MediCareHost");
+builder.Host.UseWindowsService(o => o.ServiceName = "MediCarePharmacyHost");
 
 var options = builder.Configuration.GetSection("MediCare").Get<MediCareOptions>() ?? new MediCareOptions();
 var dataDir = options.ResolveDataDir();

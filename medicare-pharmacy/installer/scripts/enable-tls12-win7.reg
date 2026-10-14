@@ -1,0 +1,17 @@
+Windows Registry Editor Version 5.00
+
+; MediCare Pharmacy: enable TLS 1.2 on a Windows 7 SP1 counter PC (same as enable-tls12-win7.ps1 without -WinHttp).
+; Double-click as an administrator, then restart Windows.
+; On 32-bit Windows 7 the Wow6432Node entries are harmless and unused.
+
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client]
+"Enabled"=dword:00000001
+"DisabledByDefault"=dword:00000000
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\.NETFramework\v4.0.30319]
+"SchUseStrongCrypto"=dword:00000001
+"SystemDefaultTlsVersions"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Microsoft\.NETFramework\v4.0.30319]
+"SchUseStrongCrypto"=dword:00000001
+"SystemDefaultTlsVersions"=dword:00000001

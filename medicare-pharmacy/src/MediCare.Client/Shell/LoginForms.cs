@@ -231,7 +231,7 @@ internal sealed class SetupForm : EntryForm
         f.AddFull(new UiLabel("First administrator", Theme.UiBold));
         f.Add("Full name", _admin);
         f.Add("Username", _username, hint: "Used to log in, e.g. rehan");
-        f.Add("Password", _password, hint: "At least 8 characters, letters and digits");
+        f.Add("Password", _password, hint: "At least 10 characters, letters and digits");
         f.Add("Repeat password", _password2);
         f.Add("Approval PIN (4-6 digits)", _pin, hint: "Used to approve discounts and refunds at a counter");
         RightPane.Controls.Add(f);
@@ -320,7 +320,7 @@ internal sealed class ChangePasswordForm : DialogForm
         var f = new FieldGrid(1);
         if (forced) f.AddFull(new UiLabel("Your administrator set a temporary password. Choose your own before you continue.", Theme.Ui, Theme.InkMuted).Wrap(Theme.S(400)));
         f.Add(forced ? "Temporary password" : "Current password", _current);
-        f.Add("New password", _new, hint: "At least 8 characters with letters and digits; not your username");
+        f.Add("New password", _new, hint: "At least 10 characters with letters and digits; not your username");
         f.Add("Repeat new password", _repeat);
         f.Add("New approval PIN (optional)", _pin, hint: "Only managers who approve need a PIN. Leave empty to keep it.");
         Body.Stack(f);
