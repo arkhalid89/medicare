@@ -36,7 +36,7 @@
 - [ ] Self-check passed the next morning.
 
 ## Known limitations
-- The Windows client was compiled and statically reviewed for both targets in this build environment; it must be exercised on real Windows 7 and Windows 10/11 PCs during the pilot (S25).
+- The Windows client compiles for both targets and the Windows 7 build was exercised under Mono (see docs/04-development/test-results.md); it must still be run on real Windows 7 and Windows 10/11 PCs, at the shop's screen scaling and with the real printers, during the pilot (S25).
 - The system is single-pharmacy and LAN-only by design (no branches, no cloud sync, no FBR POS integration).
 - Barcode scanners must be in keyboard-wedge mode; serial/COM scanners are not supported.
 - Printing uses the Windows printer driver; ESC/POS is only used for the cash drawer pulse.

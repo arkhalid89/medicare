@@ -402,9 +402,9 @@ public sealed class CloseShiftDialog : DialogForm
             f.Add($"Rs {n:#,##0} × ", box);
         }
         f.Break();
-        f.Add("Expected in drawer", new UiLabel(Money.FormatRs(s.Expected), Theme.NumLg), 2, hint: $"Float {Money.Format(s.Float)} + cash sales {Money.Format(s.CashSales)} + receipts {Money.Format(s.Receipts)} − refunds {Money.Format(s.Refunds)} − paid out {Money.Format(s.PaidOuts)}");
-        f.Add("Counted", _counted);
-        f.Add("Difference", _diff);
+        f.Add("Expected in drawer", new UiLabel(Money.FormatRs(s.Expected), Theme.NumLg), 4, hint: $"Float {Money.Format(s.Float)} + cash sales {Money.Format(s.CashSales)} + receipts {Money.Format(s.Receipts)} − refunds {Money.Format(s.Refunds)} − paid out {Money.Format(s.PaidOuts)}");
+        f.Add("Counted", _counted, 2);
+        f.Add("Difference", _diff, 2);
         f.Add("Reason for difference", _reason, 4);
         Body.Stack(f);
         AddOk("Close shift", Post);

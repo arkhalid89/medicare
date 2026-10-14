@@ -29,7 +29,7 @@ dotnet build MediCarePharmacy.sln
 dotnet test tests/MediCare.Core.Tests
 dotnet test tests/MediCare.Host.Tests
 ```
-On Linux and macOS everything builds (Windows targeting is enabled); the host and all tests run, the WinForms client does not.
+On Linux and macOS everything builds (Windows targeting is enabled) and the host and all tests run; the Windows 7 client build also runs under Mono for smoke testing. Load test against a running host: `dotnet run -c Release --project tests/MediCare.LoadTest -- --url https://localhost:8443`. Latest results: [test-results](docs/04-development/test-results.md).
 
 Run a development host (HTTP on port 8443, data in `~/medicare-data`):
 ```

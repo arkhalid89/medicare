@@ -38,6 +38,7 @@ dotnet test tests/MediCare.Host.Tests                  # end-to-end scenarios (t
 dotnet build src/MediCare.Client -f net48              # Windows 7 client only
 dotnet run --project src/MediCare.Host                 # host on http(s)://0.0.0.0:8443, data in %ProgramData%\MediCarePharmacy\Data (or ~/medicare-data)
 pwsh ./build.ps1                                       # Windows: tests, publish all, compile installers
+dotnet run -c Release --project tests/MediCare.LoadTest -- --url https://HOST:8443 --minutes 60 --rate 3   # S25 load test (results: docs/04-development/test-results.md)
 ```
 Migrations run automatically at host start (`Db.Migrate`); add a new `Sql/NNNN_name.sql`, never edit a shipped one.
 
