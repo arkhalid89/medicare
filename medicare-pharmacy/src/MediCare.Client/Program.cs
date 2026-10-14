@@ -64,7 +64,8 @@ internal static class Program
             Session.Connect(cfg.HostUrl, cfg.Fingerprint);
 
             SetupStatus? status = null;
-            try { status = Session.Api.Get<SetupStatus>("setup/status").GetAwaiter().GetResult(); }
+            // Run on the thread pool: blocking the UI thread on a UI-context continuation would deadlock.
+            try { status = Task.Run(() => Session.Api.Get<SetupStatus>("setup/status")).GetAwaiter().GetResult(); }
             catch (ApiException ex) when (ex.Code == ApiException.CertMismatch)
             {
                 if (MessageBox.Show(ex.Message + "\n\nPair this PC with the host again now?", "Security warning", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)

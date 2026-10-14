@@ -29,6 +29,8 @@ public sealed class MainForm : Form, IMessageFilter
     private AppScreen? _current;
     private DateTime _lastInput = DateTime.UtcNow;
     private bool _locked, _online = true;
+    private readonly Action<ApiException> _onAuthLost;
+    private readonly Action<bool> _onReach;
 
     /// <summary>True when the person logged out (the program shows the login again); false when the window was closed.</summary>
     public bool LoggedOut { get; private set; }
@@ -66,8 +68,10 @@ public sealed class MainForm : Form, IMessageFilter
         _nav.Navigate += item => Open(item.Key);
         _nav.BrandTitle = "MediCare Pharmacy";
         Session.SettingsChanged += OnSettingsChanged;
-        Session.Api.AuthLost += ex => BeginInvokeSafe(() => OnAuthLost(ex));
-        Session.Api.Reachability += ok => BeginInvokeSafe(() => SetOnline(ok));
+        _onAuthLost = ex => BeginInvokeSafe(() => OnAuthLost(ex));
+        _onReach = ok => BeginInvokeSafe(() => SetOnline(ok));
+        Session.Api.AuthLost += _onAuthLost;
+        Session.Api.Reachability += _onReach;
         _clock.Tick += (_, _) => Tick();
         Application.AddMessageFilter(this);
     }
@@ -396,7 +400,7 @@ public sealed class MainForm : Form, IMessageFilter
                 e.Cancel = true;
                 return;
             }
-            try { Session.Api.Post<OkResult>("auth/logout", new { }).Wait(3000); } catch { }
+            try { Task.Run(() => Session.Api.Post<OkResult>("auth/logout", new { })).Wait(3000); } catch { }
         }
         base.OnFormClosing(e);
     }
@@ -405,8 +409,11 @@ public sealed class MainForm : Form, IMessageFilter
     {
         Application.RemoveMessageFilter(this);
         Session.SettingsChanged -= OnSettingsChanged;
+        Session.Api.AuthLost -= _onAuthLost;
+        Session.Api.Reachability -= _onReach;
         _cts.Cancel();
         _clock.Stop();
+        foreach (var s in _screens.Values.Where(s => s != _current)) s.Dispose();
         base.OnFormClosed(e);
     }
 }

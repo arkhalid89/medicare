@@ -176,7 +176,7 @@ public sealed class SettlementDialog : DialogForm
         _docs.Rows.Clear();
         foreach (var d in docs.OrderBy(d => d.Date))
         {
-            var i = _docs.Rows.Add(d.No, d.Date, d.DueDate, d.Total, d.Outstanding, 0m);
+            var i = _docs.AddRow(d.No, d.Date, d.DueDate, d.Total, d.Outstanding, 0m);
             _docs.Rows[i].Tag = d;
         }
         if (!_customer) _amount.Value = docs.Sum(d => d.Outstanding);
@@ -213,7 +213,7 @@ public sealed class SettlementDialog : DialogForm
         var account = _account.Selected<CashAccountDto>();
         if (account == null) { Fail("Choose the cash or bank account."); return false; }
         var allocs = _docs.Rows.Cast<DataGridViewRow>().Where(r => r.Tag is OutstandingDoc)
-            .Select(r => new AllocationInput { DocId = ((OutstandingDoc)r.Tag).Id, Amount = Money.Parse(Convert.ToString(r.Cells[_allocCol.Index].Value, CultureInfo.InvariantCulture)) })
+            .Select(r => new AllocationInput { DocId = ((OutstandingDoc)r.Tag!).Id, Amount = Money.Parse(Convert.ToString(r.Cells[_allocCol.Index].Value, CultureInfo.InvariantCulture)) })
             .Where(a => a.Amount > 0).ToList();
         if (_customer)
         {

@@ -106,7 +106,7 @@ public class Grid : DataGridView
             for (int i = 0; i < list.Count; i++)
             {
                 var r = new DataGridViewRow();
-                r.CreateCells(this, map(list[i]));
+                r.CreateCells(this, map(list[i]).Select(v => v ?? DBNull.Value).ToArray());
                 r.Tag = list[i];
                 r.Height = Theme.RowHeight;
                 if (RowTone != null)
@@ -131,6 +131,9 @@ public class Grid : DataGridView
         if (firstVisible >= 0 && firstVisible < RowCount) { try { FirstDisplayedScrollingRowIndex = firstVisible; } catch { } }
         Invalidate();
     }
+
+    /// <summary>Adds an unbound row; null values show as empty cells.</summary>
+    public int AddRow(params object?[] values) => Rows.Add(values.Select(v => v ?? DBNull.Value).ToArray());
 
     public void SelectRow(int index)
     {
@@ -158,7 +161,7 @@ public class Grid : DataGridView
     protected override void OnCellDoubleClick(DataGridViewCellEventArgs e)
     {
         base.OnCellDoubleClick(e);
-        if (e.RowIndex >= 0 && Rows[e.RowIndex].Tag != null) RowActivated?.Invoke(Rows[e.RowIndex].Tag);
+        if (e.RowIndex >= 0 && Rows[e.RowIndex].Tag != null) RowActivated?.Invoke(Rows[e.RowIndex].Tag!);
     }
 
     protected override void OnPaint(PaintEventArgs e)

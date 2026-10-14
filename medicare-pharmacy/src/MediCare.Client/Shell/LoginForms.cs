@@ -39,7 +39,7 @@ internal sealed class BrandPanel : Panel
 internal abstract class EntryForm : Form
 {
     protected readonly BrandPanel Brand = new BrandPanel();
-    protected readonly Panel Right = new Panel();
+    protected readonly Panel RightPane = new Panel();
     protected readonly MessageBar Bar = new MessageBar();
     protected readonly FlowLayoutPanel Actions = new FlowLayoutPanel();
     private UiButton? _primary;
@@ -56,16 +56,16 @@ internal abstract class EntryForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(Theme.S(width), Theme.S(height));
         KeyPreview = true;
-        Right.Dock = DockStyle.Fill;
-        Right.Padding = new Padding(Theme.S(40), Theme.S(32), Theme.S(40), Theme.S(24));
-        Right.BackColor = Theme.Surface;
-        Right.AutoScroll = true;
+        RightPane.Dock = DockStyle.Fill;
+        RightPane.Padding = new Padding(Theme.S(40), Theme.S(32), Theme.S(40), Theme.S(24));
+        RightPane.BackColor = Theme.Surface;
+        RightPane.AutoScroll = true;
         Actions.Dock = DockStyle.Bottom;
         Actions.Height = Theme.S(64);
         Actions.FlowDirection = FlowDirection.RightToLeft;
         Actions.Padding = new Padding(Theme.S(36), Theme.S(10), Theme.S(36), Theme.S(10));
         Actions.BackColor = Theme.Surface;
-        Controls.AddRange(new Control[] { Right, Bar, Actions, Brand });
+        Controls.AddRange(new Control[] { RightPane, Bar, Actions, Brand });
         // order: Brand (left), Actions (bottom), Bar (top), Right fills
         Brand.SendToBack();
     }
@@ -147,7 +147,7 @@ internal sealed class PairingForm : EntryForm
         f.AddFull(_fp);
         f.AddFull(_confirm);
         _confirm.Enabled = false;
-        Right.Controls.Add(f);
+        RightPane.Controls.Add(f);
         Primary("Save and continue", Save);
         Secondary("Cancel", () => { DialogResult = DialogResult.Cancel; Close(); });
         Config = cfg;
@@ -234,7 +234,7 @@ internal sealed class SetupForm : EntryForm
         f.Add("Password", _password, hint: "At least 8 characters, letters and digits");
         f.Add("Repeat password", _password2);
         f.Add("Approval PIN (4-6 digits)", _pin, hint: "Used to approve discounts and refunds at a counter");
-        Right.Controls.Add(f);
+        RightPane.Controls.Add(f);
         Primary("Create pharmacy", Create);
     }
 
@@ -275,7 +275,7 @@ internal sealed class LoginForm : EntryForm
         var f = new FieldGrid(1);
         f.Add("Username", _user);
         f.Add("Password", _password);
-        Right.Stack(title, Box.Gap(16), f, Box.Gap(8), _hostLine);
+        RightPane.Stack(title, Box.Gap(16), f, Box.Gap(8), _hostLine);
         Primary("Log in", DoLogin);
         Secondary("Connection settings", () => { Repair = true; DialogResult = DialogResult.Retry; Close(); });
         Shown += (_, _) => (_user.Text.Length > 0 ? _password : _user).Focus();

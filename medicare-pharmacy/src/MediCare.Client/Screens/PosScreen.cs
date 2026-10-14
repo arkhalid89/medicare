@@ -162,7 +162,6 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
         _searchTimer.Tick += (_, _) => { _searchTimer.Stop(); Fire(Search); };
         _quoteTimer.Tick += (_, _) => { _quoteTimer.Stop(); _quoteTask = Quote(); };
         _pay.Click += (_, _) => Fire(Pay);
-        Session.SettingsChanged += () => { if (!IsDisposed) Shell?.RefreshKeys(); };
     }
 
     private Control BuildRight()
