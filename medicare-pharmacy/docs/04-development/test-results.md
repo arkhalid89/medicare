@@ -11,6 +11,7 @@ Recorded by the build team on 2026-10-14. Re-run the same commands on the pharma
 | Load test, stress (10 counters × 30 sales/min, 5 min) | PASS |
 | Restore drill (188 MB database) | PASS: 9.6 s from Restore to first login |
 | Security checklist (automated parts) | PASS |
+| Optimisation pass (dashboard, reports, gzip) | Dashboard 458 → 7 ms; slowest report 886 → 613 ms; large reports 6–12 × smaller on the wire |
 | UI smoke, Windows 7 build (net48) run under Mono on Linux, 1366×768 | Flows F1, F2, F4, F5, F6 and every screen opened; 13 defects found and fixed |
 | UI smoke on real Windows 7 SP1 and Windows 10/11 PCs, 100 % and 150 % scaling, real printers | **Not yet run** (needs the pharmacy's hardware) |
 
@@ -107,6 +108,31 @@ Defects found and fixed in this pass:
 11. Ghost and secondary buttons painted black on transparent toolbars.
 12. Keycap hints set after measuring truncated button labels ("Post inv…").
 13. Return-slip print failure message pointed to a reprint that does not exist.
+
+## Optimisation pass
+Database: the stress run's database (20,000 medicines, about 36,000 invoices posted on one day, 188 MB). Each figure is the median of three warm requests over HTTPS; 4 vCPU VM.
+
+| Request | Before | After | Change |
+|---|---|---|---|
+| Dashboard (`/reports/dashboard`) | 458 ms | 5–8 ms (cached), about 210 ms (rebuild after a write) | Cached per host and invalidated by any write or after 10 s; finance figures removed per user after the cache |
+| Report: current stock | 886 ms | 613 ms | Packs loaded in one query instead of one per medicine |
+| Report: daily sales | 568 ms | 376 ms | Payment methods aggregated once in a CTE, not per row |
+| Report: audit log | 532 ms | 330 ms | Same pack and join fixes |
+| Reports: near expiry, batch expiry, expired / quarantine | about 180 ms | 11–14 ms | Date and status filters moved into SQL |
+| Report: low stock | 105 ms | 31 ms | Stock totals in one grouped CTE |
+| Stock screen, "Low" view | 85 ms | 40 ms | Skips the batch query it never used |
+| Top sellers query (inside dashboard) | 265 ms | 71 ms | Join order forced with `CROSS JOIN` |
+
+Response size with gzip (GET only; POST responses stay uncompressed so session tokens never share a compressed body with user input):
+
+| Response | Plain | Gzip |
+|---|---|---|
+| Audit log report | 9.1 MB | 740 KB |
+| Cash book report | 4.0 MB | 568 KB |
+| Current stock report | 2.1 MB | 338 KB |
+| Stock batches list | 1.3 MB | 110 KB |
+
+Other changes: SQLite page cache 64 MB and 256 MB memory-mapped reads; release build publishes the host, host monitor and Windows 10/11 client ReadyToRun (precompiled) for faster start. All 44 tests pass after the changes.
 
 ## Still to do on the pharmacy's hardware (S25)
 - UI smoke checklist on Windows 7 SP1 and Windows 10/11 at 100 % and 150 % scaling, keyboard only.

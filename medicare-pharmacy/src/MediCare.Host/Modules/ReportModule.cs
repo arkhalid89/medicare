@@ -107,8 +107,11 @@ public sealed class ReportService(Db db, SettingsService settings, AccountServic
                     var cashier = mineOnly ? ctx.UserId : Long(p, "cashier");
                     Cols(r, ("Invoice", "text"), ("Date/time", "datetime"), ("Counter", "int"), ("Cashier", "text"), ("Customer", "text"), ("Payment", "text"), ("Gross", "money"), ("Discount", "money"), ("Tax", "money"), ("Net", "money"), ("Status", "text"));
                     long g = 0, d = 0, tx = 0, n = 0;
-                    foreach (var s in c.Query(@"SELECT s.*, u.full_name AS cashier, cu.name AS customer, (SELECT GROUP_CONCAT(DISTINCT method) FROM sales_payments WHERE header_id=s.id) AS methods
-                        FROM sales_headers s JOIN users u ON u.id=s.cashier_id JOIN customers cu ON cu.id=s.customer_id WHERE s.business_date BETWEEN @f AND @t AND (@cashier IS NULL OR s.cashier_id=@cashier) ORDER BY s.id", new { f, t, cashier }))
+                    foreach (var s in c.Query(@"WITH pm AS (SELECT sp.header_id, GROUP_CONCAT(DISTINCT sp.method) AS methods FROM sales_headers h CROSS JOIN sales_payments sp ON sp.header_id=h.id
+                            WHERE h.business_date BETWEEN @f AND @t GROUP BY sp.header_id)
+                        SELECT s.no, s.sold_at, s.counter_no, s.status, s.gross_paisa, s.discount_paisa, s.tax_paisa, s.net_paisa, u.full_name AS cashier, cu.name AS customer, pm.methods
+                        FROM sales_headers s JOIN users u ON u.id=s.cashier_id JOIN customers cu ON cu.id=s.customer_id LEFT JOIN pm ON pm.header_id=s.id
+                        WHERE s.business_date BETWEEN @f AND @t AND (@cashier IS NULL OR s.cashier_id=@cashier) ORDER BY s.id", new { f, t, cashier }))
                     {
                         var posted = (string)s.status == "POSTED";
                         r.Rows.Add(Row(s.no, DT(s.sold_at), s.counter_no, s.cashier, s.customer, ((string?)s.methods ?? "").Contains(',') ? "Split" : s.methods, M((long)s.gross_paisa), M((long)s.discount_paisa), M((long)s.tax_paisa), M((long)s.net_paisa), s.status));
@@ -333,9 +336,14 @@ public sealed class ReportService(Db db, SettingsService settings, AccountServic
                     var rows = c.Query(@"SELECT m.id AS mid, m.name, m.base_unit, b.batch_no, b.expiry_date, sb.state, sb.qty, CASE WHEN b.rack<>'' THEN b.rack ELSE m.rack END AS rack, IFNULL(mc.avg_cost_e4,0) AS avg,
                         IFNULL((SELECT sale_paisa FROM medicine_packs WHERE id=m.default_sale_pack_id),0) AS price, IFNULL(b.sale_paisa,0) AS bprice
                         FROM stock_balances sb JOIN batches b ON b.id=sb.batch_id JOIN medicines m ON m.id=b.medicine_id LEFT JOIN medicine_costs mc ON mc.medicine_id=m.id
-                        WHERE sb.qty > 0 AND (@q='' OR m.name LIKE '%'||@q||'%') ORDER BY m.name, b.expiry_date", new { q }).ToList();
+                        WHERE sb.qty > 0 AND (@q='' OR m.name LIKE '%'||@q||'%')
+                          AND (@key = 'current_stock'
+                            OR (@key = 'batch_expiry' AND b.expiry_date BETWEEN @f AND @t)
+                            OR (@key = 'near_expiry' AND sb.state='SALEABLE' AND b.expiry_date > @today AND b.expiry_date <= @horizon)
+                            OR (@key = 'expired_quarantine' AND (sb.state='QUARANTINE' OR b.expiry_date <= @today)))
+                        ORDER BY m.name, b.expiry_date", new { q, key, f, t, today = Clock.DateText(today), horizon = Clock.DateText(today.AddDays(window)) }).ToList();
                     long totValue = 0, totUnits = 0;
-                    var packs = new Dictionary<long, List<CatalogueService.PackRow>>();
+                    var packs = rows.Count > 50 ? CatalogueService.AllPacks(c, null) : new Dictionary<long, List<CatalogueService.PackRow>>();
                     foreach (var s in rows)
                     {
                         var exp = Clock.ParseDate((string)s.expiry_date);
@@ -389,10 +397,11 @@ public sealed class ReportService(Db db, SettingsService settings, AccountServic
                 {
                     Cols(r, ("Medicine", "text"), ("Saleable units", "int"), ("Minimum", "int"), ("Shortfall", "int"), ("Last supplier", "text"), ("Rack", "text"));
                     var today = Clock.DateText(Clock.Today);
-                    foreach (var s in c.Query<(string name, long qty, long min, string? supplier, string rack)>(@"SELECT m.name,
-                        IFNULL((SELECT SUM(sb.qty) FROM stock_balances sb JOIN batches b ON b.id=sb.batch_id WHERE b.medicine_id=m.id AND sb.state='SALEABLE' AND b.expiry_date > @today),0),
-                        m.min_stock_qty, (SELECT su.name FROM batches b JOIN suppliers su ON su.id=b.supplier_id WHERE b.medicine_id=m.id ORDER BY b.id DESC LIMIT 1), m.rack
-                        FROM medicines m WHERE m.is_active=1 AND m.min_stock_qty > 0 ORDER BY m.name", new { today }).Where(x => x.qty < x.min))
+                    foreach (var s in c.Query<(string name, long qty, long min, string? supplier, string rack)>(@"WITH s AS (SELECT b.medicine_id AS mid, SUM(sb.qty) AS qty
+                            FROM stock_balances sb JOIN batches b ON b.id=sb.batch_id WHERE sb.state='SALEABLE' AND b.expiry_date > @today GROUP BY b.medicine_id)
+                        SELECT m.name, IFNULL(s.qty,0), m.min_stock_qty,
+                            (SELECT su.name FROM batches b JOIN suppliers su ON su.id=b.supplier_id WHERE b.medicine_id=m.id ORDER BY b.id DESC LIMIT 1), m.rack
+                        FROM medicines m LEFT JOIN s ON s.mid=m.id WHERE m.is_active=1 AND m.min_stock_qty > IFNULL(s.qty,0) ORDER BY m.name", new { today }))
                         r.Rows.Add(Row(s.name, s.qty, s.min, s.min - s.qty, s.supplier ?? "", s.rack));
                     r.Subtitle = $"As of {Dates.Display(Clock.Today)}";
                     r.Totals = Row($"{r.Rows.Count} medicines below minimum", "", "", "", "", "");
@@ -497,15 +506,58 @@ public sealed class ReportService(Db db, SettingsService settings, AccountServic
     }
 
     // ---------- dashboard (FR-095) ----------
-    public DashboardDto Dashboard(Ctx ctx) => db.Read(c =>
+    private readonly object _dashLock = new();
+    private DashboardDto? _dash;
+    private DateTime _dashAt;
+    private long _dashVersion = -1;
+    private string _dashDay = "";
+
+    /// <summary>
+    /// Dashboard for one person. The shared figures are cached: reused while nothing was written,
+    /// and recomputed at most every 10 seconds while counters are busy (every PC polls every minute).
+    /// </summary>
+    public DashboardDto Dashboard(Ctx ctx)
+    {
+        DashboardDto shared;
+        lock (_dashLock)
+        {
+            var day = Clock.DateText(Clock.Today);
+            var fresh = _dash != null && _dashDay == day && (_dashVersion == db.WriteVersion || (Clock.UtcNow - _dashAt).TotalSeconds < 10);
+            if (!fresh)
+            {
+                var version = db.WriteVersion;
+                _dash = BuildDashboard();
+                _dashAt = Clock.UtcNow;
+                _dashVersion = version;
+                _dashDay = day;
+            }
+            shared = _dash!;
+        }
+        var d = Json.Deserialize<DashboardDto>(Json.Serialize(shared))!;
+        d.ShowFinance = ctx.Has(Perm.ReportsFinance) || ctx.Has(Perm.CashView);
+        var my = db.Read(c => c.QuerySingle<(long n, long net)>("SELECT COUNT(*), IFNULL(SUM(net_paisa),0) FROM sales_headers WHERE status='POSTED' AND business_date=@today AND cashier_id=@u",
+            new { today = d.BusinessDate, u = ctx.UserId }));
+        d.MyInvoicesToday = (int)my.n;
+        d.MySalesToday = Money.FromPaisa(my.net);
+        if (!d.ShowFinance)
+        {
+            d.CashReceivedToday = d.CashPaidToday = d.EstGrossProfitToday = d.InventoryValue = d.CustomerDues = d.SupplierDues = 0;
+            d.GrossSalesToday = d.NetSalesToday = d.PurchasesToday = d.ReturnsToday = 0;
+            d.TopSellers.Clear();
+            d.SlowMovers.Clear();
+            d.PaymentSplit.Clear();
+            d.DailySales.Clear();
+        }
+        return d;
+    }
+
+    private DashboardDto BuildDashboard() => db.Read(c =>
     {
         var today = Clock.DateText(Clock.Today);
-        var d = new DashboardDto { BusinessDate = today, ShowFinance = ctx.Has(Perm.ReportsFinance) || ctx.Has(Perm.CashView) };
+        var d = new DashboardDto { BusinessDate = today };
         var s = c.QuerySingle<(long n, long gross, long taxable)>("SELECT COUNT(*), IFNULL(SUM(gross_paisa),0), IFNULL(SUM(taxable_paisa),0) FROM sales_headers WHERE status='POSTED' AND business_date=@today", new { today });
         var ret = c.QuerySingle<(long refund, long taxable)>("SELECT IFNULL(SUM(sri.refund_paisa),0), IFNULL(SUM(sri.taxable_paisa),0) FROM sales_return_items sri JOIN sales_returns sr ON sr.id=sri.return_id WHERE sr.business_date=@today", new { today });
         d.InvoicesToday = (int)s.n; d.GrossSalesToday = Money.FromPaisa(s.gross); d.NetSalesToday = Money.FromPaisa(s.taxable - ret.taxable); d.ReturnsToday = Money.FromPaisa(ret.refund);
-        var my = c.QuerySingle<(long n, long net)>("SELECT COUNT(*), IFNULL(SUM(net_paisa),0) FROM sales_headers WHERE status='POSTED' AND business_date=@today AND cashier_id=@u", new { today, u = ctx.UserId });
-        d.MyInvoicesToday = (int)my.n; d.MySalesToday = Money.FromPaisa(my.net);
         d.PurchasesToday = Money.FromPaisa(c.ExecuteScalar<long>("SELECT IFNULL(SUM(net_paisa),0) FROM purchases WHERE status='POSTED' AND is_opening=0 AND business_date=@today", new { today }));
         var cash = c.QuerySingle<(long dr, long cr)>(@"SELECT IFNULL(SUM(jl.debit_paisa),0), IFNULL(SUM(jl.credit_paisa),0) FROM journal_lines jl JOIN journal_entries je ON je.id=jl.entry_id
             WHERE je.entry_date=@today AND jl.account_id IN (SELECT account_id FROM cash_accounts WHERE kind='CASH')", new { today });
@@ -522,8 +574,9 @@ public sealed class ReportService(Db db, SettingsService settings, AccountServic
             FROM stock_balances sb JOIN batches b ON b.id=sb.batch_id LEFT JOIN medicine_costs mc ON mc.medicine_id=b.medicine_id",
             new { today, horizon = Clock.DateText(Clock.Today.AddDays(settings.GetInt("stock.nearExpiryDays", 90))) });
         d.InventoryValue = Money.FromPaisa(inv.sale); d.NearExpiryValue = Money.FromPaisa(inv.near); d.NearExpiryCount = (int)inv.nearCount; d.ExpiredValue = Money.FromPaisa(inv.exp); d.ExpiredCount = (int)inv.expCount;
-        d.LowStockCount = c.ExecuteScalar<int>(@"SELECT COUNT(*) FROM medicines m WHERE m.is_active=1 AND m.min_stock_qty > 0 AND m.min_stock_qty >
-            IFNULL((SELECT SUM(sb.qty) FROM stock_balances sb JOIN batches b ON b.id=sb.batch_id WHERE b.medicine_id=m.id AND sb.state='SALEABLE' AND b.expiry_date > @today),0)", new { today });
+        d.LowStockCount = c.ExecuteScalar<int>(@"WITH s AS (SELECT b.medicine_id AS mid, SUM(sb.qty) AS qty FROM stock_balances sb JOIN batches b ON b.id=sb.batch_id
+                WHERE sb.state='SALEABLE' AND b.expiry_date > @today GROUP BY b.medicine_id)
+            SELECT COUNT(*) FROM medicines m LEFT JOIN s ON s.mid=m.id WHERE m.is_active=1 AND m.min_stock_qty > IFNULL(s.qty,0)", new { today });
         var cust = c.QuerySingle<(long total, long n)>(@"SELECT IFNULL(SUM(bal),0), COUNT(*) FROM (SELECT SUM(jl.debit_paisa - jl.credit_paisa) AS bal FROM journal_lines jl JOIN accounts a ON a.id=jl.account_id
             WHERE a.code='1100' AND jl.party_type='C' GROUP BY jl.party_id HAVING bal > 0)");
         var sup = c.QuerySingle<(long total, long n)>(@"SELECT IFNULL(SUM(bal),0), COUNT(*) FROM (SELECT SUM(jl.credit_paisa - jl.debit_paisa) AS bal FROM journal_lines jl JOIN accounts a ON a.id=jl.account_id
@@ -540,18 +593,22 @@ public sealed class ReportService(Db db, SettingsService settings, AccountServic
             var items = Json.Deserialize<List<SelfCheckItem>>(sc.Value.details) ?? new();
             d.SelfCheckSummary = d.SelfCheckOk ? "Stock = movements, books balanced, audit chain intact" : string.Join("; ", items.Where(i => !i.Ok).Select(i => i.Check));
         }
+        var first = Clock.DateText(Clock.Today.AddDays(-13));
+        var salesByDay = c.Query<(string day, long v)>("SELECT business_date, SUM(taxable_paisa) FROM sales_headers WHERE status='POSTED' AND business_date BETWEEN @first AND @today GROUP BY business_date", new { first, today })
+            .ToDictionary(x => x.day, x => x.v);
+        var returnsByDay = c.Query<(string day, long v)>("SELECT sr.business_date, SUM(sri.taxable_paisa) FROM sales_returns sr JOIN sales_return_items sri ON sri.return_id=sr.id WHERE sr.business_date BETWEEN @first AND @today GROUP BY sr.business_date", new { first, today })
+            .ToDictionary(x => x.day, x => x.v);
         for (int i = 13; i >= 0; i--)
         {
             var day = Clock.DateText(Clock.Today.AddDays(-i));
-            var v = c.ExecuteScalar<long>("SELECT IFNULL(SUM(taxable_paisa),0) FROM sales_headers WHERE status='POSTED' AND business_date=@day", new { day })
-                    - c.ExecuteScalar<long>("SELECT IFNULL(SUM(sri.taxable_paisa),0) FROM sales_return_items sri JOIN sales_returns sr ON sr.id=sri.return_id WHERE sr.business_date=@day", new { day });
+            var v = (salesByDay.TryGetValue(day, out var sv) ? sv : 0) - (returnsByDay.TryGetValue(day, out var rv) ? rv : 0);
             d.DailySales.Add(new KeyValuePair<string, decimal>(Clock.Today.AddDays(-i).ToString("dd-MMM", Inv), Money.FromPaisa(v)));
         }
         foreach (var x in c.Query<(string method, long amount)>(@"SELECT sp.method, SUM(sp.amount_paisa) FROM sales_payments sp JOIN sales_headers s ON s.id=sp.header_id
             WHERE s.status='POSTED' AND s.business_date=@today GROUP BY sp.method ORDER BY 2 DESC", new { today }))
             d.PaymentSplit.Add(new KeyValuePair<string, decimal>(x.method, Money.FromPaisa(x.amount)));
         var since = Clock.DateText(Clock.Today.AddDays(-6));
-        foreach (var x in c.Query<(string name, long qty, long net)>(@"SELECT si.medicine_name, SUM(si.base_qty), SUM(si.net_paisa) FROM sales_items si JOIN sales_headers s ON s.id=si.header_id
+        foreach (var x in c.Query<(string name, long qty, long net)>(@"SELECT si.medicine_name, SUM(si.base_qty), SUM(si.net_paisa) FROM sales_headers s CROSS JOIN sales_items si ON si.header_id=s.id
             WHERE s.status='POSTED' AND s.business_date >= @since GROUP BY si.medicine_id ORDER BY 3 DESC LIMIT 8", new { since }))
             d.TopSellers.Add(Row(x.name, x.qty, M(x.net)));
         var slowSince = Clock.DateText(Clock.Today.AddDays(-90));
@@ -560,10 +617,6 @@ public sealed class ReportService(Db db, SettingsService settings, AccountServic
               AND NOT EXISTS (SELECT 1 FROM sales_items si JOIN sales_headers s ON s.id=si.header_id WHERE si.medicine_id=m.id AND s.business_date >= @slowSince)
             GROUP BY m.id ORDER BY SUM(sb.qty) * IFNULL(mc.avg_cost_e4,0) DESC LIMIT 8", new { slowSince, slowIso = Clock.Iso(Clock.UtcNow.AddDays(-90)) }))
             d.SlowMovers.Add(Row(x.name, x.qty, M(Costing.Cogs((int)x.qty, Money.FromE4(x.avg)))));
-        if (!d.ShowFinance)
-        {
-            d.CashReceivedToday = d.CashPaidToday = d.EstGrossProfitToday = d.InventoryValue = d.CustomerDues = d.SupplierDues = 0;
-        }
         return d;
     });
 }

@@ -88,7 +88,8 @@ $win7Out = Join-Path $artifacts 'client-win7'
 foreach ($dir in @($hostOut, $monitorOut, $win10Out, $win7Out)) { Reset-Folder $dir }
 
 $common = @('-c', $Configuration, '--nologo', "-p:Version=$version")
-$selfContained = @('-r', 'win-x64', '--self-contained', 'true', '-p:PublishSingleFile=false')
+# ReadyToRun precompiles the self-contained apps so the host service and the Windows 10/11 client start faster.
+$selfContained = @('-r', 'win-x64', '--self-contained', 'true', '-p:PublishSingleFile=false', '-p:PublishReadyToRun=true')
 
 Invoke-Tool 'Publish host service' 'dotnet' (@('publish', (Join-Path $root 'src\MediCare.Host\MediCare.Host.csproj'), '-o', $hostOut) + $common + $selfContained)
 Invoke-Tool 'Publish host monitor' 'dotnet' (@('publish', (Join-Path $root 'src\MediCare.HostMonitor\MediCare.HostMonitor.csproj'), '-o', $monitorOut) + $common + $selfContained)

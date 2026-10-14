@@ -83,6 +83,11 @@ public sealed class CatalogueService(Db db, SettingsService settings)
     internal static List<PackRow> Packs(SqliteConnection c, SqliteTransaction? tx, long medicineId) =>
         c.Query<PackRow>("SELECT * FROM medicine_packs WHERE medicine_id=@medicineId ORDER BY base_qty DESC", new { medicineId }, tx).ToList();
 
+    /// <summary>All packs grouped by medicine in one query (reports and stock lists format thousands of quantities).</summary>
+    internal static Dictionary<long, List<PackRow>> AllPacks(SqliteConnection c, SqliteTransaction? tx) =>
+        c.Query<PackRow>("SELECT * FROM medicine_packs ORDER BY medicine_id, base_qty DESC", transaction: tx)
+            .GroupBy(p => p.MedicineId).ToDictionary(g => g.Key, g => g.ToList());
+
     internal static string QtyText(int baseQty, IEnumerable<PackRow> packs, string baseUnit) =>
         QtyFormat.Format(baseQty, packs.Where(p => p.IsActive == 1).Select(p => new PackSize(p.Name, (int)p.BaseQty)), baseUnit);
 

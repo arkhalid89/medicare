@@ -37,7 +37,8 @@ public sealed class StockService(Db db, SettingsService settings)
             var today = Clock.Today;
             var todayText = Clock.DateText(today);
             var horizon = Clock.DateText(today.AddDays(days));
-            var rows = c.Query(@"SELECT b.id, b.medicine_id, m.name, m.base_unit, m.min_stock_qty, b.batch_no, b.expiry_date, b.rack, sb.state, sb.qty, IFNULL(s.name,'') AS supplier, IFNULL(mc.avg_cost_e4,0) AS avg
+            // the LOW view is per medicine, not per batch: skip the batch query entirely
+            var rows = view == "LOW" ? new List<dynamic>() : c.Query(@"SELECT b.id, b.medicine_id, m.name, m.base_unit, m.min_stock_qty, b.batch_no, b.expiry_date, b.rack, sb.state, sb.qty, IFNULL(s.name,'') AS supplier, IFNULL(mc.avg_cost_e4,0) AS avg
                 FROM stock_balances sb JOIN batches b ON b.id=sb.batch_id JOIN medicines m ON m.id=b.medicine_id
                 LEFT JOIN suppliers s ON s.id=b.supplier_id LEFT JOIN medicine_costs mc ON mc.medicine_id=b.medicine_id
                 WHERE sb.qty > 0 AND (@q IS NULL OR m.name LIKE '%'||@q||'%' OR b.batch_no LIKE @q||'%' OR m.generic LIKE '%'||@q||'%')
@@ -47,8 +48,15 @@ public sealed class StockService(Db db, SettingsService settings)
                     OR (@view = 'EXPIRED' AND sb.state='SALEABLE' AND b.expiry_date <= @today)
                     OR (@view = 'QUARANTINE' AND sb.state='QUARANTINE'))
                 ORDER BY b.expiry_date, m.name LIMIT 5000", new { q = string.IsNullOrWhiteSpace(q) ? null : q.Trim(), view, today = todayText, horizon }).ToList();
-            var packCache = new Dictionary<long, List<CatalogueService.PackRow>>();
-            List<CatalogueService.PackRow> Packs(long mid) => packCache.TryGetValue(mid, out var p) ? p : packCache[mid] = CatalogueService.Packs(c, null, mid);
+            // packs are needed per medicine: one query each for a few rows, one bulk query once there are many
+            Dictionary<long, List<CatalogueService.PackRow>>? allPacks = null;
+            var single = new Dictionary<long, List<CatalogueService.PackRow>>();
+            List<CatalogueService.PackRow> Packs(long mid)
+            {
+                if (allPacks == null && single.Count >= 50) allPacks = CatalogueService.AllPacks(c, null);
+                if (allPacks != null) return allPacks.TryGetValue(mid, out var all) ? all : new List<CatalogueService.PackRow>();
+                return single.TryGetValue(mid, out var p) ? p : single[mid] = CatalogueService.Packs(c, null, mid);
+            }
             var result = rows.Select(r =>
             {
                 var exp = Clock.ParseDate((string)r.expiry_date);
@@ -64,10 +72,11 @@ public sealed class StockService(Db db, SettingsService settings)
             }).ToList();
             if (view == "LOW")
             {
-                result = c.Query(@"SELECT m.id, m.name, m.base_unit, m.min_stock_qty, m.rack, IFNULL(mc.avg_cost_e4,0) AS avg,
-                        IFNULL((SELECT SUM(sb.qty) FROM stock_balances sb JOIN batches b ON b.id=sb.batch_id WHERE b.medicine_id=m.id AND sb.state='SALEABLE' AND b.expiry_date > @today),0) AS qty
-                    FROM medicines m LEFT JOIN medicine_costs mc ON mc.medicine_id=m.id WHERE m.is_active=1 AND m.min_stock_qty > 0
-                      AND (@q IS NULL OR m.name LIKE '%'||@q||'%')", new { today = todayText, q = string.IsNullOrWhiteSpace(q) ? null : q.Trim() })
+                result = c.Query(@"WITH s AS (SELECT b.medicine_id AS mid, SUM(sb.qty) AS qty FROM stock_balances sb JOIN batches b ON b.id=sb.batch_id
+                        WHERE sb.state='SALEABLE' AND b.expiry_date > @today GROUP BY b.medicine_id)
+                    SELECT m.id, m.name, m.base_unit, m.min_stock_qty, m.rack, IFNULL(mc.avg_cost_e4,0) AS avg, IFNULL(s.qty,0) AS qty
+                    FROM medicines m LEFT JOIN s ON s.mid=m.id LEFT JOIN medicine_costs mc ON mc.medicine_id=m.id
+                    WHERE m.is_active=1 AND m.min_stock_qty > IFNULL(s.qty,0) AND (@q IS NULL OR m.name LIKE '%'||@q||'%')", new { today = todayText, q = string.IsNullOrWhiteSpace(q) ? null : q.Trim() })
                     .Where(r => (long)r.qty < (long)r.min_stock_qty)
                     .Select(r => new BatchRow
                     {

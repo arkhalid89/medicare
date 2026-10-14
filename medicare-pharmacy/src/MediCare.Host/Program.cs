@@ -44,6 +44,14 @@ builder.Services.AddSingleton<BackupService>();
 builder.Services.AddSingleton<SelfCheckService>();
 builder.Services.AddSingleton<CertificateInfo>(_ => options.UseHttps ? Certificates.LoadOrCreate(dataDir) : new CertificateInfo(null, ""));
 builder.Services.AddHostedService<JobsService>();
+// Reports, lists and ledgers are large JSON; gzip at the fastest level cuts LAN transfer about tenfold.
+builder.Services.AddResponseCompression(o =>
+{
+    o.EnableForHttps = true;
+    o.Providers.Add<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProvider>();
+    o.MimeTypes = new[] { "application/json", "text/csv", "text/plain" };
+});
+builder.Services.Configure<Microsoft.AspNetCore.ResponseCompression.GzipCompressionProviderOptions>(o => o.Level = System.IO.Compression.CompressionLevel.Fastest);
 
 if (options.UseHttps)
 {
@@ -62,6 +70,8 @@ db.Migrate();
 Seeder.Run(db);
 app.Services.GetRequiredService<SettingsService>().Load();
 
+// Only GET responses are compressed. Session tokens come from POST /auth/login and are never compressed, so response size cannot leak them (BREACH).
+app.UseWhen(ctx => HttpMethods.IsGet(ctx.Request.Method), branch => branch.UseResponseCompression());
 app.UseMiddleware<ErrorMiddleware>();
 app.UseRouting();
 app.UseMiddleware<AuthMiddleware>();

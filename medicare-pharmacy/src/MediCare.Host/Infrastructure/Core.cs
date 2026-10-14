@@ -137,7 +137,8 @@ public sealed class Db
     private static void Pragmas(SqliteConnection c)
     {
         using var cmd = c.CreateCommand();
-        cmd.CommandText = "PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA synchronous=FULL; PRAGMA temp_store=MEMORY;";
+        // 64 MB page cache and memory-mapped reads per connection; synchronous stays FULL for money (ADR-005)
+        cmd.CommandText = "PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000; PRAGMA synchronous=FULL; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-65536; PRAGMA mmap_size=268435456;";
         cmd.ExecuteNonQuery();
     }
 
@@ -164,10 +165,16 @@ public sealed class Db
             using var tx = c.BeginTransaction(deferred: false);
             var result = work(c, tx);
             tx.Commit();
+            Interlocked.Increment(ref _writeVersion);
             return result;
         }
         finally { _gate.Release(); }
     }
+
+    private long _writeVersion;
+
+    /// <summary>Increases after every committed write; caches compare it to know whether data changed.</summary>
+    public long WriteVersion => Interlocked.Read(ref _writeVersion);
 
     public void Write(Action<SqliteConnection, SqliteTransaction> work) => Write<int>((c, t) => { work(c, t); return 0; });
 
