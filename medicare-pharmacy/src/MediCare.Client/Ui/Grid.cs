@@ -170,7 +170,7 @@ public class Grid : DataGridView
         if (RowCount == 0 && EmptyText.Length > 0)
         {
             var r = new Rectangle(0, ColumnHeadersHeight, Width, Math.Max(Height - ColumnHeadersHeight, Theme.S(40)));
-            TextRenderer.DrawText(e.Graphics, EmptyText, Theme.Ui, r, Theme.InkMuted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
+            TextRenderer.DrawText(e.Graphics, EmptyText, Theme.Ui, r, Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
         }
     }
 

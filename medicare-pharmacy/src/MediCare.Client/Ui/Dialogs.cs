@@ -87,6 +87,13 @@ public class DialogForm : Form
     protected readonly FlowLayoutPanel Buttons;
     private UiButton? _ok;
     private bool _busy;
+    private readonly HashSet<Control> _ownEnter = new HashSet<Control>();
+
+    /// <summary>Fields that act on Enter themselves (scan boxes, search boxes) keep it instead of pressing OK.</summary>
+    protected void KeepsEnter(params Control[] controls)
+    {
+        foreach (var c in controls) _ownEnter.Add(c);
+    }
 
     public DialogForm(string title, int width = 560)
     {
@@ -179,19 +186,31 @@ public class DialogForm : Form
             var multiline = active is TextBox tb && tb.Multiline;
             var inGrid = active is DataGridView || active?.Parent is DataGridView;
             var inButton = active is Button;
-            if (!multiline && !inGrid && !inButton) { _ok.PerformClick(); return true; }
+            var ownEnter = active != null && _ownEnter.Contains(active);
+            if (!multiline && !inGrid && !inButton && !ownEnter) { _ok.PerformClick(); return true; }
         }
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
     /// <summary>Sizes the dialog to its body content (up to 85% of the screen height).</summary>
+    private int? _fitMin;
+
     protected void FitToContent(int minHeight = 160)
     {
+        _fitMin = minHeight;
         Body.PerformLayout();
-        var content = Body.Controls.Cast<Control>().Where(c => c.Visible).Select(c => c.Bottom).DefaultIfEmpty(0).Max() + Body.Padding.Vertical;
+        // Control.Visible is false for every control until the form is shown, so it cannot filter here.
+        var content = Body.Controls.Cast<Control>().Select(c => c.Bottom + c.Margin.Bottom).DefaultIfEmpty(0).Max() + Body.Padding.Vertical;
         var max = (int)(System.Windows.Forms.Screen.PrimaryScreen!.WorkingArea.Height * 0.85);
         var h = Math.Min(Math.Max(Theme.S(minHeight), content + Buttons.Height + Theme.S(16)), max);
         ClientSize = new Size(ClientSize.Width, h);
+    }
+
+    protected override void OnLoad(EventArgs e)
+    {
+        base.OnLoad(e);
+        // measure again once handles exist and auto-sized children have laid out
+        if (_fitMin.HasValue) FitToContent(_fitMin.Value);
     }
 
     protected override void OnShown(EventArgs e)

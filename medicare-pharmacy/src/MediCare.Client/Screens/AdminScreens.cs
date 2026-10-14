@@ -41,7 +41,7 @@ public sealed class ApprovalsScreen : AppScreen
         Compose(Box.Toolbar(new Control[] { _status.Sized(140) }, new Control[] { reject, approve }), Box.Gap(6), card);
     }
 
-    protected override Task OnFirstShow() { _status.SelectedIndex = 0; return Task.CompletedTask; }
+    protected override Task OnFirstShow() => Fill();
     protected override Task OnReshow() => Fill();
 
     public override void OnHostEvent(EventDto e)

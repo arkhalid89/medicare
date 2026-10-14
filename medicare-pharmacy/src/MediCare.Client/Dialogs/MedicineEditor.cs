@@ -101,6 +101,7 @@ public sealed class MedicineEditorDialog : DialogForm
             if (code.Length > 0 && !_barcodes.Rows.Cast<DataGridViewRow>().Any(r => Convert.ToString(r.Cells[0].Value) == code)) _barcodes.Rows.Add(code, "");
             _scan.Clear();
         };
+        KeepsEnter(_scan);
         codesPage.Stack(new UiLabel("Each barcode belongs to one medicine. For 2D (GS1 DataMatrix) packs, scan the box: the product code (GTIN) is stored.", Theme.Small, Theme.InkMuted), Box.Gap(6), _scan, Box.Gap(6), codeHost);
 
         tabs.TabPages.AddRange(new[] { details, packsPage, codesPage });

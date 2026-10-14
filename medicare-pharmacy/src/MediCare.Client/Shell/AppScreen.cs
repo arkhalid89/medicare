@@ -34,6 +34,8 @@ public abstract class AppScreen : UserControl
         }
         else await Run(OnReshow);
         FocusFirst();
+        // a screen without inputs (dashboard) must still receive the keyboard: hand focus to the menu
+        if (!ContainsFocus && !SelectNextControl(null, true, true, true, true)) Shell?.FocusNavigation();
     }
 
     /// <summary>Load data the first time the screen opens.</summary>

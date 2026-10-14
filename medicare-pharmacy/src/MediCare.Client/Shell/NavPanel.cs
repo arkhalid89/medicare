@@ -69,8 +69,8 @@ public sealed class NavPanel : Control
             g.DrawLine(p, cx - Theme.S(8), cy, cx + Theme.S(8), cy);
             g.DrawLine(p, cx, cy - Theme.S(8), cx, cy + Theme.S(8));
         }
-        TextRenderer.DrawText(g, BrandTitle, Theme.UiBold, new Rectangle(pad + Theme.S(40), Theme.S(14), Width - pad * 2 - Theme.S(40), Theme.S(20)), Color.White, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(g, BrandSub, Theme.Xs, new Rectangle(pad + Theme.S(40), Theme.S(34), Width - pad * 2 - Theme.S(40), Theme.S(18)), Theme.NavInk, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(g, BrandTitle, Theme.UiBold, new Rectangle(pad + Theme.S(40), Theme.S(14), Width - pad * 2 - Theme.S(40), Theme.S(20)), Color.White, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(g, BrandSub, Theme.Xs, new Rectangle(pad + Theme.S(40), Theme.S(34), Width - pad * 2 - Theme.S(40), Theme.S(18)), Theme.NavInk, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
 
         g.SetClip(new Rectangle(0, BrandHeight, Width, Height - BrandHeight));
         int y = BrandHeight + Theme.S(4) - _offset;
@@ -83,7 +83,7 @@ public sealed class NavPanel : Control
                 if (group.Length > 0)
                 {
                     y += Theme.S(8);
-                    TextRenderer.DrawText(g, group.ToUpperInvariant(), Theme.Xs, new Rectangle(pad, y, Width - pad * 2, Theme.S(20)), Theme.Hex("#7F969A"), TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                    TextRenderer.DrawText(g, group.ToUpperInvariant(), Theme.Xs, new Rectangle(pad, y, Width - pad * 2, Theme.S(20)), Theme.Hex("#7F969A"), TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
                     y += Theme.S(22);
                 }
             }
@@ -106,16 +106,41 @@ public sealed class NavPanel : Control
                 using (var b = new SolidBrush(Theme.Hex("#E8B04A")))
                 using (var path = Theme.Rounded(br, Theme.S(9)))
                     g.FillPath(b, path);
-                TextRenderer.DrawText(g, text, Theme.Xs, br, Theme.Ink, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, text, Theme.Xs, br, Theme.Ink, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 textRect.Width = br.Left - textRect.Left - Theme.S(4);
             }
-            TextRenderer.DrawText(g, item.Title, selected ? Theme.UiBold : Theme.Ui, textRect, selected ? Color.White : Theme.NavInk, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            TextRenderer.DrawText(g, item.Title, selected ? Theme.UiBold : Theme.Ui, textRect, selected ? Color.White : Theme.NavInk, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             _hits.Add((r, item));
             y += h + Theme.S(2);
         }
         _contentHeight = y + _offset - BrandHeight + Theme.S(12);
         g.ResetClip();
     }
+
+    // ---- keyboard: Up/Down move, Enter opens ----
+    protected override bool IsInputKey(Keys keyData) =>
+        keyData == Keys.Up || keyData == Keys.Down || keyData == Keys.Enter || base.IsInputKey(keyData);
+
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (_items.Count > 0 && (e.KeyCode == Keys.Up || e.KeyCode == Keys.Down))
+        {
+            var current = _hover ?? _items.FirstOrDefault(i => i.Key == _selected) ?? _items[0];
+            var i = Compat.Clamp(_items.IndexOf(current) + (e.KeyCode == Keys.Down ? 1 : -1), 0, _items.Count - 1);
+            _hover = _items[i];
+            Invalidate();
+            e.Handled = true;
+        }
+        else if (e.KeyCode == Keys.Enter && _hover != null)
+        {
+            Navigate?.Invoke(_hover);
+            e.Handled = true;
+        }
+        base.OnKeyDown(e);
+    }
+
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { _hover = null; Invalidate(); base.OnLostFocus(e); }
 
     protected override void OnMouseWheel(MouseEventArgs e)
     {

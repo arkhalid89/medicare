@@ -116,6 +116,14 @@ public static class Theme
         _ => Surface,
     };
 
+    /// <summary>The colour actually behind a control: the first ancestor whose background is not transparent.</summary>
+    public static Color EffectiveBack(Control? c)
+    {
+        for (; c != null; c = c.Parent)
+            if (c.BackColor.A == 255) return c.BackColor;
+        return Canvas;
+    }
+
     public static GraphicsPath Rounded(Rectangle r, int radius)
     {
         var p = new GraphicsPath();
@@ -142,7 +150,12 @@ public static class Theme
     /// <summary>Grey hint text inside an empty text box (works on Windows 7 and later).</summary>
     public static void Cue(TextBox box, string text)
     {
-        void Apply() => SendMessage(box.Handle, 0x1501 /* EM_SETCUEBANNER */, (IntPtr)1, text);
+        void Apply()
+        {
+            // cosmetic only: never let a missing native call (other platforms, old comctl32) break a screen
+            try { SendMessage(box.Handle, 0x1501 /* EM_SETCUEBANNER */, (IntPtr)1, text); }
+            catch (Exception ex) when (ex is EntryPointNotFoundException || ex is DllNotFoundException) { }
+        }
         if (box.IsHandleCreated) Apply(); else box.HandleCreated += (_, _) => Apply();
     }
 }

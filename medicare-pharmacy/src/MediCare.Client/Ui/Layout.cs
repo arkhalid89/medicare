@@ -11,6 +11,8 @@ public static class Box
         parent.SuspendLayout();
         foreach (var c in children)
         {
+            // an undocked child would sit at (0,0) on top of the others
+            if (c.Dock == DockStyle.None) c.Dock = DockStyle.Top;
             parent.Controls.Add(c);
             c.BringToFront();
         }

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- S25 load and concurrency test (testing.md). Drives a running host over HTTP(S) like 10 counters would. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>MediCare.LoadTest</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\MediCare.Contracts\MediCare.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\MediCare.Core\MediCare.Core.csproj" />
+  </ItemGroup>
+</Project>

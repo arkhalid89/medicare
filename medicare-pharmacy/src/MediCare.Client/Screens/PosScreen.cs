@@ -112,14 +112,16 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
         top.Controls.AddRange(new Control[] { _scan, gap, _customerButton });
 
         // ---- cart ----
-        _grid.Col("#", 40, ColKind.Int);
-        _grid.Col("Medicine", 0, ColKind.Text, 300);
-        _grid.Col("Pack", 110);
-        _grid.Col("Qty", 70, ColKind.Int);
-        _grid.Col("Rate", 100, ColKind.Money);
-        _grid.Col("Disc.", 90, ColKind.Money);
-        _grid.Col("Amount", 120, ColKind.Money);
-        _grid.Col("Batch (expiry)", 0, ColKind.Mono, 160);
+        _grid.Col("#", 34, ColKind.Int);
+        _grid.Col("Medicine", 0, ColKind.Text, 300).MinimumWidth = Theme.S(120);
+        _grid.Col("Pack", 76);
+        _grid.Col("Qty", 52, ColKind.Int);
+        _grid.Col("Rate", 84, ColKind.Money);
+        _grid.Col("Disc.", 70, ColKind.Money);
+        _grid.Col("Amount", 96, ColKind.Money);
+        var batchCol = _grid.Col("Batch (expiry)", 0, ColKind.Mono, 160);
+        // on narrow windows the batch shows in the line inspector instead
+        _grid.Resize += (_, _) => batchCol.Visible = _grid.Width >= Theme.S(700);
         foreach (DataGridViewColumn c in _grid.Columns) c.SortMode = DataGridViewColumnSortMode.NotSortable;
         _grid.EmptyText = "Scan a barcode or type a name to start the sale.";
         _grid.RowTone = o => o is CartLine l ? (l.Error != null ? Tone.Danger : l.Quote?.NearestExpiry is DateTime e && (e - DateTime.Today).TotalDays <= Session.Settings.NearExpiryDays ? Tone.Warn : Tone.None) : Tone.None;
@@ -166,32 +168,33 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
 
     private Control BuildRight()
     {
-        var right = new Panel { Dock = DockStyle.Right, Width = Theme.S(360) };
-        var lineCard = new Card("Selected line") { Dock = DockStyle.Top, Height = Theme.S(150) };
+        var right = new Panel { Dock = DockStyle.Right, Width = Theme.S(336) };
+        // the line inspector takes whatever height is left, so payment stays visible on 768-pixel screens
+        var lineCard = new Card("Selected line") { Dock = DockStyle.Fill };
         _lineName.AutoSize = false; _lineName.Dock = DockStyle.Top; _lineName.Height = Theme.S(26);
         _lineInfo.AutoSize = false; _lineInfo.Dock = DockStyle.Fill;
         var badgeRow = new FlowLayoutPanel { Dock = DockStyle.Top, Height = Theme.S(26), BackColor = Color.Transparent };
         badgeRow.Controls.Add(_lineBadge);
         lineCard.Stack(_lineName, badgeRow, _lineInfo);
 
-        var totals = new Card("Totals") { Dock = DockStyle.Top, Height = Theme.S(170) };
-        var t = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 4, BackColor = Color.Transparent };
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        t.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        void Row(int r, string label, Label value)
+        var totals = new Card("Totals") { Dock = DockStyle.Top, Height = Theme.S(136) };
+        Panel Row(string label, Label value)
         {
-            t.Controls.Add(new UiLabel(label, Theme.Ui, Theme.InkMuted), 0, r);
-            value.Anchor = AnchorStyles.Right;
-            t.Controls.Add(value, 1, r);
+            var row = new Panel { Dock = DockStyle.Top, Height = Theme.S(24), BackColor = Color.Transparent };
+            value.AutoSize = false;
+            value.Dock = DockStyle.Right;
+            value.Width = Theme.S(170);
+            value.TextAlign = ContentAlignment.MiddleRight;
+            var l = new UiLabel(label, Theme.Ui, Theme.InkMuted) { AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0) };
+            row.Controls.Add(l);
+            row.Controls.Add(value);
+            return row;
         }
-        t.Controls.Add(_items, 0, 0);
-        t.SetColumnSpan(_items, 2);
-        Row(1, "Gross", _gross);
-        Row(2, "Discount", _discount);
-        Row(3, "Sales tax", _tax);
-        totals.Controls.Add(t);
+        _items.AutoSize = false;
+        _items.Height = Theme.S(22);
+        totals.Stack(_items, Row("Gross", _gross), Row("Discount", _discount), Row("Sales tax", _tax));
 
-        var netCard = new Card("Net payable") { Dock = DockStyle.Top, Height = Theme.S(118) };
+        var netCard = new Card("Net payable") { Dock = DockStyle.Top, Height = Theme.S(112) };
         _net.AutoSize = false;
         _net.Dock = DockStyle.Fill;
         _net.TextAlign = ContentAlignment.MiddleRight;
@@ -216,8 +219,8 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
         actions.Controls.Add(A("Return", "F9", Return), 1, 1);
         _last.AutoSize = false;
         _last.Dock = DockStyle.Top;
-        _last.Height = Theme.S(40);
-        right.Stack(lineCard, Box.Gap(8), totals, Box.Gap(8), netCard, Box.Gap(10), _pay, actions, Box.Gap(6), _last);
+        _last.Height = Theme.S(34);
+        right.Stack(totals, Box.Gap(8), netCard, Box.Gap(8), _pay, actions, Box.Gap(4), _last, Box.Gap(8), lineCard);
         return right;
     }
 
@@ -521,10 +524,11 @@ public sealed class PosScreen : AppScreen, IHasUnsavedWork
         var q = _quote;
         var units = _cart.Sum(l => l.Qty);
         _items.Text = _cart.Count == 0 ? "No items" : $"{_cart.Count} line{(_cart.Count == 1 ? "" : "s")} · {units} pack{(units == 1 ? "" : "s")}";
-        _gross.Text = q == null ? "…" : Money.Format(q.Gross);
-        _discount.Text = q == null ? "…" : q.Discount == 0 ? "0.00" : $"-{Money.Format(q.Discount)} ({q.DiscountPercent:0.##}%)";
+        var empty = _cart.Count == 0;
+        _gross.Text = empty ? "0.00" : q == null ? "…" : Money.Format(q.Gross);
+        _discount.Text = empty ? "0.00" : q == null ? "…" : q.Discount == 0 ? "0.00" : $"-{Money.Format(q.Discount)} ({q.DiscountPercent:0.##}%)";
         _discount.ForeColor = q != null && q.DiscountPercent > (Session.Login?.MaxDiscountPercent ?? 0) ? Theme.Warn : Theme.Ink;
-        _tax.Text = q == null ? "…" : Money.Format(q.Tax);
+        _tax.Text = empty ? "0.00" : q == null ? "…" : Money.Format(q.Tax);
         _net.Text = _cart.Count == 0 ? "0.00" : q == null ? "…" : Money.Format(q.Net);
         _pay.Enabled = _cart.Count > 0;
         _customerButton.Text = _customer == null ? "Walk-in customer" : _customer.Name + (_customer.Type == "CREDIT" || _customer.Balance != 0 ? $"  ·  due {Money.Format(_customer.Balance)}" : "");

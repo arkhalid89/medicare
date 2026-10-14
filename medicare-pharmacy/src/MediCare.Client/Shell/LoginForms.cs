@@ -29,9 +29,9 @@ internal sealed class BrandPanel : Panel
             g.DrawLine(p, c.X - Theme.S(13), c.Y, c.X + Theme.S(13), c.Y);
             g.DrawLine(p, c.X, c.Y - Theme.S(13), c.X, c.Y + Theme.S(13));
         }
-        TextRenderer.DrawText(g, Heading, Theme.Title, new Rectangle(pad, pad + Theme.S(68), Width - pad * 2, Theme.S(30)), Color.White, TextFormatFlags.Left);
-        TextRenderer.DrawText(g, Lines, Theme.Ui, new Rectangle(pad, pad + Theme.S(104), Width - pad * 2, Height - pad * 2 - Theme.S(140)), Theme.Hex("#D8EEEF"), TextFormatFlags.Left | TextFormatFlags.WordBreak);
-        TextRenderer.DrawText(g, "Version " + Program.Version, Theme.Xs, new Rectangle(pad, Height - pad - Theme.S(16), Width - pad * 2, Theme.S(16)), Theme.Hex("#BFE3E5"), TextFormatFlags.Left);
+        TextRenderer.DrawText(g, Heading, Theme.Title, new Rectangle(pad, pad + Theme.S(68), Width - pad * 2, Theme.S(30)), Color.White, TextFormatFlags.NoPrefix | TextFormatFlags.Left);
+        TextRenderer.DrawText(g, Lines, Theme.Ui, new Rectangle(pad, pad + Theme.S(104), Width - pad * 2, Height - pad * 2 - Theme.S(140)), Theme.Hex("#D8EEEF"), TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.WordBreak);
+        TextRenderer.DrawText(g, "Version " + Program.Version, Theme.Xs, new Rectangle(pad, Height - pad - Theme.S(16), Width - pad * 2, Theme.S(16)), Theme.Hex("#BFE3E5"), TextFormatFlags.NoPrefix | TextFormatFlags.Left);
     }
 }
 

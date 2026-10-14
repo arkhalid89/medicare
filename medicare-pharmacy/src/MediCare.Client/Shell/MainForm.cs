@@ -209,6 +209,8 @@ public sealed class MainForm : Form, IMessageFilter
         return _current as T;
     }
 
+    public void FocusNavigation() => _nav.Focus();
+
     public void RefreshKeys()
     {
         if (_current != null)

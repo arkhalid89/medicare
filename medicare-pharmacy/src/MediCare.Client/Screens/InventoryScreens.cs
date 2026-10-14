@@ -143,7 +143,7 @@ public sealed class BatchesScreen : AppScreen
     }
 
     public override void FocusFirst() => _q.Focus();
-    protected override Task OnFirstShow() { _view.SelectedIndex = 0; return Task.CompletedTask; }
+    protected override Task OnFirstShow() => Fill();
     protected override Task OnReshow() => Fill();
 
     /// <summary>Opens the screen on a view (e.g. from the dashboard's near-expiry tile).</summary>

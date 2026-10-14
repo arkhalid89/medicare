@@ -10,10 +10,10 @@ namespace MediCare.Host.Tests;
 public class ScenarioTests
 {
     // ---------- helpers ----------
-    private static async Task<long> CreateSupplier(Api api, string name = "Muller & Phipps Pakistan") =>
+    internal static async Task<long> CreateSupplier(Api api, string name = "Muller & Phipps Pakistan") =>
         (await api.Post<OkResult>("/api/v1/suppliers", new SupplierDto { Name = name, Mobile = "0300-1234567", TermsDays = 30 })).Id!.Value;
 
-    private static async Task<MedicineDto> CreateRisek(Api api, decimal stripPrice = 420m, string barcode = "8964000202029", string? schedule = null)
+    internal static async Task<MedicineDto> CreateRisek(Api api, decimal stripPrice = 420m, string barcode = "8964000202029", string? schedule = null)
     {
         var id = (await api.Post<OkResult>("/api/v1/medicines", new MedicineDto
         {
@@ -25,9 +25,9 @@ public class ScenarioTests
         return await api.Get<MedicineDto>($"/api/v1/medicines/{id}");
     }
 
-    private static long Pack(MedicineDto m, string name) => m.Packs.Single(p => p.Name == name).Id;
+    internal static long Pack(MedicineDto m, string name) => m.Packs.Single(p => p.Name == name).Id;
 
-    private static async Task<PurchaseDto> Receive(Api api, long supplierId, MedicineDto m, int boxes, decimal rate, int free = 0, decimal disc = 0, decimal charges = 0,
+    internal static async Task<PurchaseDto> Receive(Api api, long supplierId, MedicineDto m, int boxes, decimal rate, int free = 0, decimal disc = 0, decimal charges = 0,
         string batch = "RK0925", DateTime? expiry = null, string supplierInv = "")
     {
         var id = (await api.Post<OkResult>("/api/v1/purchases", new PurchaseDto
@@ -38,14 +38,14 @@ public class ScenarioTests
         return await api.Post<PurchaseDto>($"/api/v1/purchases/{id}/post", new PostRequest { IdempotencyKey = Guid.NewGuid().ToString() });
     }
 
-    private static SaleRequest CashSale(MedicineDto m, string pack, int qty, decimal amount, decimal tendered = 0, decimal invoiceDiscount = 0) => new()
+    internal static SaleRequest CashSale(MedicineDto m, string pack, int qty, decimal amount, decimal tendered = 0, decimal invoiceDiscount = 0) => new()
     {
         IdempotencyKey = Guid.NewGuid().ToString(), CounterNo = 1, InvoiceDiscount = invoiceDiscount,
         Lines = new() { new SaleLineInput { MedicineId = m.Id, PackId = Pack(m, pack), Qty = qty } },
         Payments = new() { new PaymentInput { Method = PaymentMethods.Cash, Amount = amount, Tendered = tendered == 0 ? amount : tendered } },
     };
 
-    private static T Sql<T>(TestHost host, string sql) { using var c = new SqliteConnection($"Data Source={Path.Combine(host.DataDir, "medicare.db")}"); c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = sql; return (T)Convert.ChangeType(cmd.ExecuteScalar()!, typeof(T)); }
+    internal static T Sql<T>(TestHost host, string sql) { using var c = new SqliteConnection($"Data Source={Path.Combine(host.DataDir, "medicare.db")}"); c.Open(); using var cmd = c.CreateCommand(); cmd.CommandText = sql; return (T)Convert.ChangeType(cmd.ExecuteScalar()!, typeof(T)); }
 
     // ---------- tests ----------
     [Fact]

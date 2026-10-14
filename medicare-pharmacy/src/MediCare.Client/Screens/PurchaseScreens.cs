@@ -157,6 +157,7 @@ public sealed class PurchaseEditorDialog : DialogForm
         _scan.Height = Theme.ControlHeightLg;
         _scan.Font = Theme.Lg;
         _scan.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; UiRun.Fire(this, CaptureScan, Bar); } };
+        KeepsEnter(_scan);
         _scan.KeyPress += (_, e) => { if (e.KeyChar == (char)29) { _scan.SelectedText = "\u001d"; e.Handled = true; } };
 
         _grid.ReadOnly = false;

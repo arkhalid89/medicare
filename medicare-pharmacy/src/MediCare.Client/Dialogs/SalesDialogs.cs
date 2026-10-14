@@ -425,6 +425,7 @@ public sealed class SalesReturnDialog : DialogForm
         var find = new UiButton("Find invoice") { Dock = DockStyle.Right };
         find.Click += (_, _) => UiRun.Fire(this, () => LoadSale(_no.Text.Trim(), null), Bar);
         _no.KeyDown += (_, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; UiRun.Fire(this, () => LoadSale(_no.Text.Trim(), null), Bar); } };
+        KeepsEnter(_no);
         var top = new Panel { Dock = DockStyle.Top, Height = Theme.ControlHeight };
         top.Controls.AddRange(new Control[] { _no, find });
 
@@ -510,7 +511,7 @@ public sealed class SalesReturnDialog : DialogForm
         var req = new SalesReturnRequest { IdempotencyKey = _key, SaleId = _sale.Id, Lines = lines, RefundMethod = method };
         var result = await Approvals.Run(this, tokens => { req.ApprovalToken = tokens.LastOrDefault(); return Session.Api.Post<SalesReturnResult>("sales-returns", req, tokens); });
         if (!Printers.Receipt(result.Receipt, openDrawer: method == "CASH"))
-            Msg.Error(this, $"Return {result.No} is saved, but the slip did not print. Reprint it from Invoices.");
+            Msg.Error(this, $"Return {result.No} is saved, but the slip did not print. Check the receipt printer; the return is in the sales returns report.");
         Msg.Info(this, $"Return {result.No} posted. Refund {Money.FormatRs(result.Refund)}" + (method == "CASH" ? " — give the cash to the customer." : "."));
         return true;
     }

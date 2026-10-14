@@ -31,6 +31,7 @@ public sealed class TestHost : IDisposable
     }
 
     public Api Anonymous() => new(_factory.CreateClient());
+    public IServiceProvider Services => _factory.Services;
 
     public async Task<Api> SetupAndLoginAdmin()
     {

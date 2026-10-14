@@ -14,8 +14,20 @@ public class UiButton : Button
     [DefaultValue(ButtonKind.Secondary)]
     public ButtonKind Kind { get => _kind; set { _kind = value; Invalidate(); } }
 
-    /// <summary>Keyboard shortcut shown as a keycap, e.g. "F4" or "Ctrl+S".</summary>
-    public string Hint { get; set; } = "";
+    private string _hint = "";
+
+    /// <summary>Keyboard shortcut shown as a keycap, e.g. "F4" or "Ctrl+S". Changing it re-measures the width.</summary>
+    public string Hint
+    {
+        get => _hint;
+        set
+        {
+            var grow = Width > 0 && Width == Measure();
+            _hint = value ?? "";
+            if (grow || Width < Measure()) Width = Measure();
+            Invalidate();
+        }
+    }
 
     public UiButton() : this("", ButtonKind.Secondary) { }
 
@@ -60,14 +72,15 @@ public class UiButton : Button
     {
         var g = e.Graphics;
         Theme.Smooth(g);
-        g.Clear(Parent?.BackColor ?? Theme.Canvas);
+        var behind = Theme.EffectiveBack(Parent);
+        g.Clear(behind);
         Color back, fore, border;
         switch (Kind)
         {
             case ButtonKind.Primary: back = _hover ? Theme.PrimaryHover : Theme.Primary; fore = Color.White; border = back; break;
             case ButtonKind.Accent: back = _hover ? Theme.AccentHover : Theme.Accent; fore = Color.White; border = back; break;
             case ButtonKind.Danger: back = _hover ? Theme.Hex("#9A1D14") : Theme.Danger; fore = Color.White; border = back; break;
-            case ButtonKind.Ghost: back = _hover ? Theme.SurfaceAlt : (Parent?.BackColor ?? Theme.Canvas); fore = Theme.Accent; border = back; break;
+            case ButtonKind.Ghost: back = _hover ? Theme.SurfaceAlt : behind; fore = Theme.Accent; border = back; break;
             default: back = _hover ? Theme.SurfaceAlt : Theme.Surface; fore = Theme.Ink; border = Theme.LineStrong; break;
         }
         if (!Enabled) { back = Theme.SurfaceAlt; fore = Theme.LineStrong; border = Theme.Line; }
@@ -91,10 +104,10 @@ public class UiButton : Button
             using (var path = Theme.Rounded(kr, Theme.S(3)))
             using (var b = new SolidBrush(Kind == ButtonKind.Secondary || Kind == ButtonKind.Ghost ? Theme.SurfaceAlt : Color.FromArgb(40, Color.White)))
                 g.FillPath(b, path);
-            TextRenderer.DrawText(g, Hint, Theme.Keycap, kr, fore, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(g, Hint, Theme.Keycap, kr, fore, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             textRect.Width = kr.Left - textRect.Left - Theme.S(4);
         }
-        TextRenderer.DrawText(g, Text, Font, textRect, fore, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(g, Text, Font, textRect, fore, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
     }
 }
 
@@ -190,9 +203,9 @@ public sealed class KeycapBar : Control
             // keycap bottom edge
             using (var pen = new Pen(k.Primary && enabled ? Color.Black : Theme.LineStrong, Theme.S(2)))
                 g.DrawLine(pen, cap.Left + Theme.S(3), cap.Bottom, cap.Right - Theme.S(3), cap.Bottom);
-            TextRenderer.DrawText(g, k.KeyText, Theme.Keycap, cap, capFore, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(g, k.KeyText, Theme.Keycap, cap, capFore, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             var labelRect = new Rectangle(cap.Right + Theme.S(6), 0, labelSize.Width + Theme.S(4), Height);
-            TextRenderer.DrawText(g, k.Label, Theme.Small, labelRect, enabled ? Theme.Ink : Theme.LineStrong, TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
+            TextRenderer.DrawText(g, k.Label, Theme.Small, labelRect, enabled ? Theme.Ink : Theme.LineStrong, TextFormatFlags.NoPrefix | TextFormatFlags.VerticalCenter | TextFormatFlags.Left);
             _hits.Add((whole, k));
             x += total + Theme.S(6);
         }
@@ -234,7 +247,7 @@ public class Card : Panel
         base.OnPaint(e);
         using (var p = new Pen(Theme.Line)) e.Graphics.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
         if (Heading.Length > 0)
-            TextRenderer.DrawText(e.Graphics, Heading.ToUpperInvariant(), Theme.Xs, new Rectangle(Theme.S(14), Theme.S(10), Width - Theme.S(28), Theme.S(20)), Theme.InkMuted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(e.Graphics, Heading.ToUpperInvariant(), Theme.Xs, new Rectangle(Theme.S(14), Theme.S(10), Width - Theme.S(28), Theme.S(20)), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
     }
 }
 
@@ -272,9 +285,9 @@ public sealed class KpiTile : Control
         if (Tone != Tone.None)
             using (var b = new SolidBrush(Theme.Fore(Tone))) g.FillRectangle(b, 0, 0, Theme.S(4), Height);
         var pad = Theme.S(16);
-        TextRenderer.DrawText(g, Label.ToUpperInvariant(), Theme.Xs, new Rectangle(pad, Theme.S(12), Width - pad * 2, Theme.S(18)), Theme.InkMuted, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(g, Value, Theme.Kpi, new Rectangle(pad, Theme.S(32), Width - pad * 2, Theme.S(36)), Tone == Tone.Danger ? Theme.Danger : Theme.Ink, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
-        TextRenderer.DrawText(g, Sub, Theme.Small, new Rectangle(pad, Theme.S(72), Width - pad * 2, Theme.S(22)), Tone == Tone.None ? Theme.InkMuted : Theme.Fore(Tone), TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(g, Label.ToUpperInvariant(), Theme.Xs, new Rectangle(pad, Theme.S(12), Width - pad * 2, Theme.S(18)), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(g, Value, Theme.Kpi, new Rectangle(pad, Theme.S(32), Width - pad * 2, Theme.S(36)), Tone == Tone.Danger ? Theme.Danger : Theme.Ink, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(g, Sub, Theme.Small, new Rectangle(pad, Theme.S(72), Width - pad * 2, Theme.S(22)), Tone == Tone.None ? Theme.InkMuted : Theme.Fore(Tone), TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
     }
 }
 
@@ -330,7 +343,7 @@ public sealed class BarChart : Control
         g.Clear(BackColor);
         if (_data.Count == 0)
         {
-            TextRenderer.DrawText(g, "No data yet", Theme.Small, ClientRectangle, Theme.InkMuted, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+            TextRenderer.DrawText(g, "No data yet", Theme.Small, ClientRectangle, Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
             return;
         }
         var max = Math.Max(_data.Max(d => d.Value), 1m);
@@ -345,9 +358,9 @@ public sealed class BarChart : Control
                 var y = i * rowH;
                 var avail = Width - labelW - valueW - Theme.S(8);
                 var w = (int)(avail * (float)(_data[i].Value / max));
-                TextRenderer.DrawText(g, _data[i].Key, Theme.Small, new Rectangle(0, y, labelW, rowH), Theme.Ink, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+                TextRenderer.DrawText(g, _data[i].Key, Theme.Small, new Rectangle(0, y, labelW, rowH), Theme.Ink, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
                 g.FillRectangle(bar, labelW, y + rowH / 4, Math.Max(w, 1), rowH / 2);
-                TextRenderer.DrawText(g, Format(_data[i].Value), Theme.NumSmall, new Rectangle(labelW + w + Theme.S(6), y, valueW, rowH), Theme.InkMuted, TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
+                TextRenderer.DrawText(g, Format(_data[i].Value), Theme.NumSmall, new Rectangle(labelW + w + Theme.S(6), y, valueW, rowH), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Left | TextFormatFlags.VerticalCenter);
             }
             return;
         }
@@ -362,10 +375,10 @@ public sealed class BarChart : Control
             var h = (bottom - top) * (float)(_data[i].Value / max);
             var x = i * slot + (slot - bw) / 2;
             g.FillRectangle(bar, x, bottom - h, bw, h);
-            TextRenderer.DrawText(g, _data[i].Key, Theme.Xs, new Rectangle((int)(i * slot), bottom + 2, (int)slot, Theme.S(18)), Theme.InkMuted, TextFormatFlags.HorizontalCenter);
+            TextRenderer.DrawText(g, _data[i].Key, Theme.Xs, new Rectangle((int)(i * slot), bottom + 2, (int)slot, Theme.S(18)), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.HorizontalCenter);
         }
         var last = _data[_data.Count - 1];
-        TextRenderer.DrawText(g, "Max " + Format(max), Theme.Xs, new Rectangle(0, 0, Width, top), Theme.InkMuted, TextFormatFlags.Right);
+        TextRenderer.DrawText(g, "Max " + Format(max), Theme.Xs, new Rectangle(0, 0, Width, top), Theme.InkMuted, TextFormatFlags.NoPrefix | TextFormatFlags.Right);
     }
 }
 
@@ -576,7 +589,9 @@ public sealed class MessageBar : Label
         ForeColor = Theme.Fore(tone);
         using (var g = CreateGraphics())
         {
-            var size = TextRenderer.MeasureText(g, text, Font, new Size(Math.Max(Width - Padding.Horizontal, 200), 0), TextFormatFlags.WordBreak);
+            // before the first layout Width can be tiny; measure against the parent's width instead
+            var width = Math.Max(Parent?.ClientSize.Width ?? Width, Width) - Padding.Horizontal;
+            var size = TextRenderer.MeasureText(g, text, Font, new Size(Math.Max(width, 300), 0), TextFormatFlags.WordBreak);
             Height = Math.Max(Theme.S(36), size.Height + Theme.S(14));
         }
         Visible = true;
